@@ -10,6 +10,7 @@ from setuptools import setup
 
 __version__ = "0.1"
 
+
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
 # README file and 2) it's easier to type in the README file than to put a raw
@@ -27,8 +28,8 @@ setup(
     license="Apache 2",
     keywords="sweetpay checkout payment",
     url="https://github.com/sweetpay/sweetpay-python",
-    download_url="https://github.com/sweetpay/sweetpay-python/tarball/%s" % __version__,
+    download_url="https://github.com/sweetpay/sweetpay-"
+                 "python/tarball/%s" % __version__,
     packages=["sweetpay"],
-    install_requires=["marshmallow==2.9.0", "requests==2.10.0"],
-    long_description="Coming soon",
+    install_requires=["marshmallow==2.9.0", "requests==2.10.0"]
 )
