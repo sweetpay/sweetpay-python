@@ -25,7 +25,7 @@ setup(
     description="An SDK to talk with the Sweetpay APIs",
     license="Apache 2",
     keywords="sweetpay checkout payment",
-    url="https://developers.sweetpayments.com/docs",
+    url="https://github.com/sweetpay/sweetpay-python",
     packages=["sweetpay"],
     install_requires=["marshmallow==2.9.0", "requests==2.10.0"],
     long_description=read('README.md'),
