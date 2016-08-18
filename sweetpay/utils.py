@@ -8,13 +8,16 @@ from collections import namedtuple
 
 from decimal import Decimal
 
+import requests
 from marshmallow import Schema
-from marshmallow import ValidationError
-from marshmallow import post_dump
 from requests import Session
 
+from .errors import SweetpayError, BadDataError, InvalidParameterError, \
+    InternalServerError, UnderMaintenanceError, UnauthorizedError, \
+    NotFoundError, TimeoutError, RequestError
+
 ResponseClass = namedtuple("ResponseClass",
-                           ["response", "status_code", "data"])
+                           ["response", "code", "data", "status"])
 
 
 class BaseResource(object):
@@ -23,6 +26,7 @@ class BaseResource(object):
     api_token = None
     stage = None
     version = None
+    timeout = None
 
     @classmethod
     def get_client(cls):
@@ -34,7 +38,7 @@ class BaseResource(object):
         return cls.CLIENT_CLS(cls.api_token, cls.stage, cls.version)
 
 
-def configure(api_token, stage, version=None):
+def configure(api_token, stage, version=None, timeout=None):
     """Configure the API with global variables
 
     :param api_token: The API token provided by SweetPay.
@@ -42,6 +46,7 @@ def configure(api_token, stage, version=None):
                   or production environment.
     :param version: An integer or string indicating which version
                     of the API to use. For example: 1
+    :param timeout: The request timeout, defaults to
     :return: None
     """
     # We accomplish this by just setting some global variables
@@ -49,6 +54,7 @@ def configure(api_token, stage, version=None):
     BaseResource.api_token = api_token
     BaseResource.stage = stage
     BaseResource.version = version
+    BaseResource.timeout = timeout
 
 
 class BaseSchema(Schema):
@@ -76,7 +82,7 @@ class SweetpayJSONEncoder(json.JSONEncoder):
 class BaseClient(object):
     """The super class used to create API clients."""
 
-    def __init__(self, api_token, stage, version=None):
+    def __init__(self, api_token, stage, version=None, timeout=None):
         """Initialize the checkout client used to talk to the checkout API.
 
         :param api_token: The authorization token to set in the
@@ -84,10 +90,12 @@ class BaseClient(object):
         :param stage: A boolean indicating if the stage server should
                be used or not. If set to False, the live server will be used.
         :param version: The version number of the API, defaults to 1.
+        :param timeout: The request timeout. Defaults to 15 seconds.
         """
         self.stage = stage
         self.version = version or 1
         self.api_token = api_token
+        self.timeout = timeout or 15
 
         # Setup the logger
         self.logger = logging.getLogger("sweetpay-sdk")
@@ -136,95 +144,141 @@ class BaseClient(object):
                 deserialization, and then pass on to the server.
         :param respschema: The schema to use for deserialization.
         :param params: The parameters passed by the client.
-        :raises: marshmallow.ValidationError if a param is invalid,
-                requests.RequestException if the request fails.
-        :returns: Return a dictionary with the keys "response",
+        :raise BadDataError: If the HTTP status code is 400
+        :raise InvalidParameterError: If the HTTP status code is 422
+        :raise InternalServerError: If an internal server error occurred
+                                    at Sweetpay.
+        :raise UnauthorizedError: If the API token was invalid.
+        :raise NotFoundError: If the requested resource couldn't be found.
+        :raise UnderMaintenanceError: If the server is currently
+                                      under maintenance.
+        :raise TimeoutError: If a request timeout occurred.
+        :raise RequestError: If an unhandled request error occurred.
+        :return: Return a dictionary with the keys "response",
                 "status_code", "data" and "raw_data".
         """
 
         logger = self.logger
 
-        if method == "GET":
+        # We want the method to be in lower-case for easier handling.
+        method = method.lower()
+
+        # Set default values for the request args and kwargs.
+        reqargs = [url]
+        reqkwargs = {"timeout": self.timeout}
+
+        # Handle the method types appropriately
+        if method == "get":
             logger.info("Sending request with method=GET to url=%s", url)
-            resp = self.session.get(url)
-        else:
+        elif method == "post":
             # TODO: Catch exception
             to_dump = reqschema().dump(params).data
+            # Encode the data to JSON
             reqdata = SweetpayJSONEncoder().encode(to_dump)
+            # Log the progress
             logger.info("Sending request with method=POST to url=%s and "
                         "parameters=%s", url, reqdata)
-            resp = self.session.post(url, data=reqdata)
+            # Set data as a kwarg to the request function
+            reqkwargs["data"] = reqdata
+        else:
+            raise ValueError("Only GET and POST requests are allowed, "
+                             "not method=%s", method)
+
+        # Send the actual response
+        response_func = getattr(self.session, method)
         try:
-            # Try to deserialize the response
+            resp = response_func(*reqargs, **reqkwargs)
+        except requests.Timeout as e:
+            # If the request timed out.
+            raise TimeoutError("The request timed out", code=None, status=None,
+                               respone=None, exc=e)
+        except requests.RequestException as e:
+            # If another request error occurred.
+            raise RequestError("Could not send a request to the server",
+                               code=None, status=None, response=None,
+                               exc=e)
+        # Shortcut to status code
+        code = resp.status_code
+        logger.info("With url=%s and method=%s, received status_code=%d "
+                    "and body=%s", resp.status_code, url, method, resp.text)
+
+        try:
+            # Try to decode the (hopefully) JSON response
             data = resp.json()
         except (TypeError, ValueError):
-            # Set the data to None if the JSON deserialization
-            # failed.
-            data = None
             logger.error("Could not deserialize JSON for request "
                          "to url=%s, response=%s", url, resp.text)
+            data = None
+            status = None
         else:
-            # If the deserialization succeeded.
-            if respschema:
+            # TODO: Remove hack
+            # We do this because the API sometimes return a string
+            # as the data, and a string obviously can't have a status.
+            if isinstance(data, dict):
+                # Let's deserialize the data to Python objects.
                 data = respschema.load(data).data
 
-        # Return a response
-        return ResponseClass(response=resp, status_code=resp.status_code,
-                             data=data)
-
-    def _params_to_camel(self, params):
-        converted = {}
-        for key, val in params.items():
-            converted_key = to_camel(key)
-            if isinstance(val, dict):
-                converted[converted_key] = self._params_to_camel(val)
+                # Now it's time to extract the status. If no status was
+                # passed, an error will be raised as that shouldn't
+                # be possible.
+                try:
+                    status = data["status"]
+                except KeyError:
+                    # We throw a general error here as this isn't
+                    # supposed to happen.
+                    raise SweetpayError("No status was passed from Sweetpay, "
+                                        "even though the JSON was valid. This "
+                                        "is most likely an error "
+                                        "in Sweetpay's API", code=code,
+                                        status=None, data=data, response=resp)
             else:
-                converted[converted_key] = val
-        return converted
+                status = None
+
+        # Check if the response was successful.
+        if code == 200:
+            # Return a response class
+            return ResponseClass(response=resp, code=resp.status_code,
+                                 data=data, status=status)
+
+        # The standard kwargs to send to the exception when raised
+        exc_kwargs = {"code": code, "response": resp, "status": status,
+                      "data": data}
+        # Bad Data
+        if code == 400:
+            raise BadDataError("The data passed to the server "
+                               "contained bad data. This most likely means "
+                               "that you missed to send some parameters, "
+                               "response data={0}".format(data),
+                               **exc_kwargs)
+        # Unauthorized
+        elif code == 401:
+            raise UnauthorizedError("The passed API token was invalid",
+                                    **exc_kwargs)
+        # Not Found
+        elif code == 404:
+            raise NotFoundError("The resource you were looking for couldn't "
+                                "be found", **exc_kwargs)
+        # Unprocessable Entity
+        elif code == 422:
+            raise InvalidParameterError("You passed in an invalid "
+                                        "parameter or missed a parameter"
+                                        "parameter, response data={0}".format(data),
+                                        **exc_kwargs)
+        # Internal Server Error
+        elif code == 500:
+            raise InternalServerError("An internal server occurred",
+                                      **exc_kwargs)
+        # Under Maintenance
+        elif code == 503:
+            raise UnderMaintenanceError("The server is currently under"
+                                        "maintenance and can't be contacted",
+                                        **exc_kwargs)
+        # Something else happened, just throw a general error.
+        else:
+            raise SweetpayError("Something went wrong in the request",
+                                **exc_kwargs)
 
     def __repr__(self):
         return u"<{0}: stage={1}, version={2}>".format(type(self).__name__,
                                                        self.stage,
                                                        self.version)
-
-
-# TODO: Needs testing.
-def to_snake(cc):
-    """Convert a camel case string to snake case.
-
-    :param cc: The string to convert.
-    :return: A string in snake case.
-    """
-    n = []
-    for x in cc:
-        if x.isupper():
-            n.append("_")
-            x = x.lower()
-        n.append(x)
-    if n[0] == "_":
-        n = n[1:]
-    return "".join(n)
-
-
-# TODO: Needs testing.
-def to_camel(sc):
-    """Convert a snake case string to camel case.
-
-    :param sc: The string to convert.
-    :return: A string in camel case.
-    """
-    n = []
-    len_sc = len(sc)
-    i = 0
-    while i < len_sc:
-        x = sc[i]
-        if x == "_":
-            i += 1
-            if i < len_sc:
-                n.append(sc[i].upper())
-            else:
-                break
-        else:
-            n.append(x)
-        i += 1
-    return "".join(n)
