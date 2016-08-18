@@ -1,9 +1,9 @@
 import json
 
 from marshmallow import fields
-from .utils import BaseClient, BaseSchema
+from .utils import BaseClient, BaseSchema, BaseResource
 
-__all__ = ["SubscriptionClient", "deserialize_callback_data"]
+__all__ = ["SubscriptionClient", "deserialize_callback_data", "Subscription"]
 
 
 class NameSchema(BaseSchema):
@@ -97,10 +97,10 @@ class CallbackEnvelope(BaseSchema):
     payload = fields.Nested(SubscriptionSchema)
 
 
-class CreateSubscriptionSchema(BaseSchema):
+class CreateSubscriptionRequestSchema(BaseSchema):
     """The Schema representing the CreateSessionRequest object"""
     country = fields.String()
-    merchant_id = fields.String(required=True, dump_to="merchantId")
+    merchant_id = fields.String(dump_to="merchantId")
     language = fields.String()
     merchant_customer_id = fields.String(dump_to="merchantCustomerId")
 
@@ -139,10 +139,10 @@ class CreateSubscriptionSchema(BaseSchema):
 class UpdateSubscriptionSchema(BaseSchema):
     starts_at = fields.Date(dump_to="startsAt")
     ends_at = fields.Date(dump_to="endsAt")
-    max_execution = fields.Integer(dump_to="maxExecutions")
+    max_executions = fields.Integer(dump_to="maxExecutions")
 
 
-class SearchSubscriptionSchema(BaseSchema):
+class SearchSubscriptionRequestSchema(BaseSchema):
     country = fields.String()
     merchant_id = fields.String(dump_to="merchantId")
     merchant_customer_id = fields.String(dump_to="merchantCustomerId")
@@ -156,9 +156,7 @@ class SearchSubscriptionSchema(BaseSchema):
     subscription_state = fields.String(dump_to="subscriptionState")
     event = fields.String()
     until = fields.Date()
-
-# Necessary hack because of Python's interpretation of "from"
-setattr(SearchSubscriptionSchema, "from", fields.Date())
+    from_ = fields.Date(attribute="from", dump_to="from")
 
 
 class SubscriptionClient(BaseClient):
@@ -179,8 +177,8 @@ class SubscriptionClient(BaseClient):
     def create_subscription(self, **params):
         """Create a subscription."""
         url = self.build_url("create")
-        return self.make_request(url, "POST", EnvelopeSchema(),
-                                 CreateSubscriptionSchema, params)
+        return self.make_request(url, "POST", EnvelopeSchema(), 
+                                 CreateSubscriptionRequestSchema, params)
 
     def regret_subscription(self, subscription_id):
         """Regret a subscription."""
@@ -190,18 +188,18 @@ class SubscriptionClient(BaseClient):
     def update_subscription(self, subscription_id, **params):
         """Update a subscription"""
         url = self.build_url(str(subscription_id), "update")
-        return self.make_request(url, "POST", EnvelopeSchema(),
+        return self.make_request(url, "POST", EnvelopeSchema(), 
                                  UpdateSubscriptionSchema, params)
 
     def query_subscription(self, subscription_id):
         url = self.build_url(str(subscription_id), "query")
         return self.make_request(url, "GET", EnvelopeSchema())
-
+    
     def search_subscription(self, **params):
         """Search for subscriptions."""
         url = self.build_url("search")
-        return self.make_request(url, "POST", SearchEnvelopeSchema(),
-                                 SearchSubscriptionSchema, params)
+        return self.make_request(url, "POST", SearchEnvelopeSchema(), 
+                                 SearchSubscriptionRequestSchema, params)
 
 
 def deserialize_callback_data(data, is_json_str=False):
@@ -214,3 +212,29 @@ def deserialize_callback_data(data, is_json_str=False):
     if is_json_str:
         data = json.loads(data)
     return CallbackEnvelope().load(data).data
+
+
+class Subscription(BaseResource):
+    """The subscription resource."""
+
+    CLIENT_CLS = SubscriptionClient
+
+    @classmethod
+    def create(cls, *args, **kwargs):
+        return cls.get_client().create_subscription(*args, **kwargs)
+
+    @classmethod
+    def get(cls, *args, **kwargs):
+        return cls.get_client().query_subscription(*args, **kwargs)
+
+    @classmethod
+    def update(cls, *args, **kwargs):
+        return cls.get_client().update(*args, **kwargs)
+
+    @classmethod
+    def search(cls, *args, **kwargs):
+        return cls.get_client().search_subscription(*args, **kwargs)
+
+    @classmethod
+    def regret(cls, *args, **kwargs):
+        return cls.get_client().regret_subscription(*args, **kwargs)

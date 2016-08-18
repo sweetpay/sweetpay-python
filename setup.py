@@ -1,3 +1,10 @@
+"""
+Copyright (C) 2015 David Buresund - All Rights Reserved
+Unauthorized copying of this file, via any medium is strictly prohibited
+Proprietary and confidential
+Written by David Buresund <david.buresund@gmail.com>, September 2015
+"""
+
 import os
 from setuptools import setup
 

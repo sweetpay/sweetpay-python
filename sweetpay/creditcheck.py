@@ -1,8 +1,8 @@
 from marshmallow import fields
 
-from .utils import BaseClient, BaseSchema
+from .utils import BaseClient, BaseSchema, BaseResource
 
-__all__ = ["CreditCheckClient"]
+__all__ = ["Creditcheck", "CreditcheckClient"]
 
 
 class NameSchema(BaseSchema):
@@ -19,7 +19,7 @@ class AddressSchema(BaseSchema):
     city = fields.String()
     region = fields.String()
     country = fields.String()
-    care_of = fields.String(dump_to="careOf")
+    care_of = fields.String(load_from="careOf", dump_to="careOf")
 
 
 class CustomerSchema(BaseSchema):
@@ -53,7 +53,7 @@ class LogEntrySchema(BaseSchema):
     session_id = fields.UUID(load_from="sessionId")
 
 
-class CreditCheckSchema(BaseSchema):
+class CreditcheckSchema(BaseSchema):
     """The Schema representing the CreditCheck object"""
     credits = fields.List(fields.Nested(CreditSchema))
     log = fields.List(fields.Nested(LogEntrySchema))
@@ -64,11 +64,11 @@ class EnvelopeSchema(BaseSchema):
     """The Schema representing the Envelope object"""
     created_at = fields.DateTime(load_from="createdAt")
     status = fields.String()
-    payload = fields.Nested(CreditCheckSchema)
+    payload = fields.Nested(CreditcheckSchema)
     version = fields.String()
 
 
-class CreditCheckRequestSchema(BaseSchema):
+class CreditcheckRequestSchema(BaseSchema):
     """The Schema representing the CreateSessionRequest object"""
     country = fields.String()
     language = fields.String()
@@ -108,7 +108,7 @@ class CreditcheckSearchRequestSchema(BaseSchema):
     until = fields.Date()
 
 
-class CreditCheckClient(BaseClient):
+class CreditcheckClient(BaseClient):
     """The client used to connect to the creditcheck API"""
 
     @property
@@ -142,9 +142,23 @@ class CreditCheckClient(BaseClient):
         """
         url = self.build_url("check")
         return self.make_request(url, "POST", EnvelopeSchema(),
-                                 CreditCheckRequestSchema, params)
+                                 CreditcheckRequestSchema, params)
 
-    def search(self, **params):
+    def search_checks(self, **params):
         url = self.build_url("log")
         return self.make_request(url, "POST", EnvelopeSchema(),
                                  CreditcheckSearchRequestSchema, params)
+
+
+class Creditcheck(BaseResource):
+    """The creditcheck resource."""
+
+    CLIENT_CLS = CreditcheckClient
+
+    @classmethod
+    def create(cls, **params):
+        return cls.get_client().make_check(**params)
+
+    @classmethod
+    def search(cls, **params):
+        return cls.get_client().search_checks(**params)

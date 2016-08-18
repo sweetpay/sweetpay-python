@@ -1,8 +1,13 @@
+"""
+Copyright (C) 2015 David Buresund - All Rights Reserved
+Unauthorized copying of this file, via any medium is strictly prohibited
+Proprietary and confidential
+Written by David Buresund <david.buresund@gmail.com>, September 2015
+"""
 from marshmallow import fields
+from .utils import BaseClient, BaseSchema, BaseResource
 
-from .utils import BaseClient, BaseSchema
-
-__all__ = ["CheckoutClient"]
+__all__ = ["CheckoutSession", "CheckoutClient"]
 
 
 class TransactionSchema(BaseSchema):
@@ -39,7 +44,7 @@ class SubscriptionSchema(BaseSchema):
 
 
 class NameSchema(BaseSchema):
-    """The v representing the Name object"""
+    """The Schema representing the Name object"""
     first = fields.String()
     last = fields.String()
     org = fields.String()
@@ -52,7 +57,7 @@ class AddressSchema(BaseSchema):
     city = fields.String()
     region = fields.String()
     country = fields.String()
-    care_of = fields.String(dump_to="careOf")
+    care_of = fields.String(load_from="careOf")
 
 
 class CustomerSchema(BaseSchema):
@@ -130,7 +135,7 @@ class VerifyPurchaseBodySchema(BaseSchema):
 class CreateSessionRequestSchema(BaseSchema):
     """The Schema representing the CreateSessionRequest object"""
     country = fields.String()
-    merchant_id = fields.String(required=True, dump_to="merchantId")
+    merchant_id = fields.String(dump_to="merchantId")
     transactions = fields.Nested(TransactionSchema, many=True)
     subscriptions = fields.Nested(SubscriptionSchema, many=True)
     redirect_target = fields.String(dump_to="redirectTarget")
@@ -190,6 +195,7 @@ class CheckoutClient(BaseClient):
         """Create a checkout session.
 
         :param params: The parameters to pass on to the marshmallow
+
                 deserialization, and then pass on to the server.
         :raises: marshmallow.ValidationError if a param is invalid,
                 requests.RequestException if the request fails.
@@ -199,3 +205,13 @@ class CheckoutClient(BaseClient):
         url = self.build_url("session", "create")
         return self.make_request(url, "POST", EnvelopeSchema(),
                                  CreateSessionRequestSchema, params)
+
+
+class CheckoutSession(BaseResource):
+    """The checkout session resource."""
+
+    CLIENT_CLS = CheckoutClient
+
+    @classmethod
+    def create(cls, **params):
+        return cls.get_client().create_session(**params)
