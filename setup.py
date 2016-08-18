@@ -18,8 +18,8 @@ def read(fname):
 
 
 setup(
-    name="test-new-sdk",
-    version="0.0.1",
+    name="sweetpay",
+    version="0.1",
     author="David Buresund",
     author_email="david.buresund@paylevo.com",
     description="A library to talk with the Sweetpay API",

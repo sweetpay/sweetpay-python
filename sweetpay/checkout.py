@@ -4,39 +4,15 @@ Unauthorized copying of this file, via any medium is strictly prohibited
 Proprietary and confidential
 Written by David Buresund <david.buresund@gmail.com>, September 2015
 """
-import json
-import os
-from requests import Session, RequestException
-from marshmallow import Schema, fields, ValidationError
-import datetime
+from marshmallow import fields
+from .utils import BaseClient, BaseSchema, BaseResource
 
-__all__ = ["CheckoutClient", "RequestException", "ValidationError"]
+__all__ = ["CheckoutSession", "CheckoutClient"]
 
 
-class SweetpayJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.date):
-            return obj.strftime("%Y-%m-%d")
-        elif isinstance(obj, datetime.timedelta):
-            return (datetime.datetime.min + obj).time().isoformat()
-        else:
-            return super(SweetpayJSONEncoder, self).default(obj)
-
-
-VALID_COUNTRIES = ["SE", "FI", "DE", "NO"]
-VALID_CURRENCIES = ["SEK", "EUR", "USD"]
-VALID_REDIRECT_TARGETS = ["CLOSE", "TOP", "ELSE"]
-VALID_LANGUAGES = ["sv", "en", "de", "fi", "nb"]
-VALID_PAYMENT_METHODS = ["INVOICE"]
-VALID_INTERVALS = ["WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"]
-
-
-class TransactionSchema(Schema):
-    currency = fields.String(
-        validate=lambda cu: cu.upper() in VALID_CURRENCIES
-    )
+class TransactionSchema(BaseSchema):
+    """The Schema representing the Transaction object"""
+    currency = fields.String()
     amount = fields.Float()
     merchant_transaction_id = fields.String(dump_to="merchantTransactionId")
     merchant_item_id = fields.String(dump_to="merchantItemId")
@@ -50,14 +26,11 @@ class TransactionSchema(Schema):
     comment = fields.String()
 
 
-class SubscriptionSchema(Schema):
-    currency = fields.String(
-        validate=lambda cu: cu.upper() in VALID_CURRENCIES
-    )
+class SubscriptionSchema(BaseSchema):
+    """The Schema representing the Subscription object"""
+    currency = fields.String()
     amount = fields.Float()
-    interval = fields.String(
-        validate=lambda intr: intr.upper() in VALID_INTERVALS
-    )
+    interval = fields.String()
     starts_at = fields.Date(dump_to="startsAt")
     ends_at = fields.Date(dump_to="endsAt")
     max_executions = fields.Integer(dump_to="maxExecutions")
@@ -70,23 +43,25 @@ class SubscriptionSchema(Schema):
     amount_per_item = fields.String(dump_to="amountPerItem")
 
 
-class NameSchema(Schema):
+class NameSchema(BaseSchema):
+    """The Schema representing the Name object"""
     first = fields.String()
     last = fields.String()
     org = fields.String()
 
 
-class AddressSchema(Schema):
+class AddressSchema(BaseSchema):
+    """The Schema representing the Address object"""
     street = fields.String()
     zip = fields.String()
     city = fields.String()
     region = fields.String()
-    # TODO: Remove duplicate code
-    country = fields.String(validate=lambda x: x.upper() in VALID_COUNTRIES)
-    care_of = fields.String(dump_to="careOf")
+    country = fields.String()
+    care_of = fields.String(load_from="careOf")
 
 
-class CustomerSchema(Schema):
+class CustomerSchema(BaseSchema):
+    """The Schema representing the Customer object"""
     phone = fields.String()
     ssn = fields.String()
     org = fields.String()
@@ -95,20 +70,23 @@ class CustomerSchema(Schema):
     address = fields.Nested(AddressSchema)
 
 
-class PayloadSchema(Schema):
+class PayloadSchema(BaseSchema):
+    """The Schema representing the Payload object"""
     url = fields.URL()
     session_id = fields.UUID(load_from="sessionId")
     status = fields.String()
 
 
-class EnvelopeSchema(Schema):
+class EnvelopeSchema(BaseSchema):
+    """The Schema representing the Envelope object"""
     created_at = fields.DateTime(load_from="createdAt")
     status = fields.String()
     payload = fields.Nested(PayloadSchema)
     version = fields.String()
 
 
-class CallbackPayloadSchema(Schema):
+class CallbackPayloadSchema(BaseSchema):
+    """The Schema representing the CallbackPayload object"""
     session_id = fields.UUID(load_from="sessionId")
     merchant_session_id = fields.String(load_from="merchantSessionId")
     merchant_customer_id = fields.String(load_from="merchant_customer_id")
@@ -122,7 +100,8 @@ class CallbackPayloadSchema(Schema):
     billing = fields.Nested(CustomerSchema)
 
 
-class CallbackEnvelope(Schema):
+class CallbackEnvelope(BaseSchema):
+    """The Schema representing the CallbackEnvelope object"""
     created_at = fields.DateTime(load_from="createdAt")
     sent_at = fields.DateTime(load_from="sentAt")
     callback_id = fields.Integer(load_from="callbackId")
@@ -131,12 +110,14 @@ class CallbackEnvelope(Schema):
     payload = fields.Nested(CallbackPayloadSchema)
 
 
-class VerifyPurchaseReplySchema(Schema):
+class VerifyPurchaseReplySchema(BaseSchema):
+    """The Schema representing the VerifyPurchaseReply object"""
     comment = fields.String()
     status = fields.String()
 
 
-class VerifyPurchaseBodySchema(Schema):
+class VerifyPurchaseBodySchema(BaseSchema):
+    """The Schema representing the VerifyPurchaseBody object"""
     session_id = fields.UUID()
     merchant_session_id = fields.String(load_from="merchantSessionId")
     merchant_customer_id = fields.String(load_from="merchantCustomerId")
@@ -150,19 +131,14 @@ class VerifyPurchaseBodySchema(Schema):
     billing = fields.Nested(CustomerSchema)
 
 
-class CreateSessionRequestSchema(Schema):
-    country = fields.String(
-        validate=lambda x: x.upper() in VALID_COUNTRIES, required=True
-    )
-    merchant_id = fields.String(required=True, dump_to="merchantId")
-    # TODO: Required if not subscriptions
-    transactions = fields.Nested(TransactionSchema, many=True, required=True)
-    subscriptions = fields.Nested(SubscriptionSchema, many=True, required=True)
-    # TODO: Test for all camel to snake
-    redirect_target = fields.String(
-        validate=lambda rt: rt.upper() in VALID_REDIRECT_TARGETS,
-        dump_to="redirectTarget"
-    )
+# TODO: Test for all camel to snake and vice versa.
+class CreateSessionRequestSchema(BaseSchema):
+    """The Schema representing the CreateSessionRequest object"""
+    country = fields.String()
+    merchant_id = fields.String(dump_to="merchantId")
+    transactions = fields.Nested(TransactionSchema, many=True)
+    subscriptions = fields.Nested(SubscriptionSchema, many=True)
+    redirect_target = fields.String(dump_to="redirectTarget")
     redirect_on_failure_url = fields.URL(dump_to="redirectOnFailureUrl")
     redirect_on_success_url = fields.URL(dump_to="redirectOnSuccessUrl")
     callback_on_failure_url = fields.URL(dump_to="callbackOnFailureUrl")
@@ -171,9 +147,7 @@ class CreateSessionRequestSchema(Schema):
     verify_purchase_url = fields.URL(dump_to="verifyPurchaseUrl")
     merchant_terms_url = fields.URL(dump_to="merchantTermsUrl")
 
-    language = fields.String(
-        validate=lambda lang: lang.upper() in VALID_LANGUAGES
-    )
+    language = fields.String()
 
     mechant_session_id = fields.String(dump_to="merchantSessionId")
     merchant_customer_id = fields.String(dump_to="merchantCustomerId")
@@ -192,71 +166,52 @@ class CreateSessionRequestSchema(Schema):
 
     merchant_order_id = fields.String(dump_to="merchantOrderId")
 
-    payment_method = fields.String(
-        validate=lambda pm: pm.upper() in VALID_PAYMENT_METHODS,
-        dump_to="paymentMethod"
-    )
+    payment_method = fields.String(dump_to="paymentMethod")
     hold_execution = fields.Boolean(dump_to="holdExecution")
 
 
-class CheckoutClient(object):
-
-    def __init__(self, auth_token, stage, version=1):
-        self.stage = stage
-        self.version = version
-        self.auth_token = auth_token
-        self.session = Session()
-        self.session.headers.update({
-            "Authorization": auth_token, "Content-Type": "application/json",
-            "Accept": "application/json", "User-Agent": "Python-SDK"
-        })
+class CheckoutClient(BaseClient):
+    """The client used to connect to the checkout API"""
 
     @property
     def url(self):
+        """Return the stage or production URL, depending on the settings."""
         if self.stage:
-            return (
-                "https://checkout.stage.paylevo.com/v{0}".format(self.version)
-            )
+            return self.stage_url
         else:
-            return (
-                "https://checkout.paylevo.com/v{0}".format(self.version)
-            )
+            return self.production_url
 
-    def build_url(self, *args):
-        return os.path.join(self.url, *args)
+    @property
+    def stage_url(self):
+        """Return the stage URL."""
+        return "https://checkout.stage.paylevo.com/v{0}".format(self.version)
+
+    @property
+    def production_url(self):
+        """Return the production URL."""
+        return "https://checkout.paylevo.com/v{0}".format(self.version)
 
     def create_session(self, **params):
         """Create a checkout session.
 
         :param params: The parameters to pass on to the marshmallow
-                  deserialization, and then pass on to the server.
+
+                deserialization, and then pass on to the server.
         :raises: marshmallow.ValidationError if a param is invalid,
-                 requests.RequestException if the request fails.
+                requests.RequestException if the request fails.
         :returns: Return a dictionary with the keys "response",
-                 "status_code", "data" and "raw_data".
+                "status_code", "data" and "raw_data".
         """
-        try:
-            dump_obj = CreateSessionRequestSchema(strict=True).dump(params)
-        except ValidationError:
-            raise
-        else:
-            data = SweetpayJSONEncoder().encode(dump_obj.data)
+        url = self.build_url("session", "create")
+        return self.make_request(url, "POST", EnvelopeSchema(),
+                                 CreateSessionRequestSchema, params)
 
-        try:
-            resp = self.session.post(
-                self.build_url("session", "create"), data=data
-            )
-        except RequestException:
-            raise
 
-        # Try to deserialize the response
-        try:
-            resp_json = resp.json()
-        except (TypeError, ValueError):
-            data = None
-        else:
-            data = EnvelopeSchema().load(resp_json).data
-        return {
-            "response": resp, "status_code": resp.status_code,
-            "data": data, "raw_data": resp.text
-        }
+class CheckoutSession(BaseResource):
+    """The checkout session resource."""
+
+    CLIENT_CLS = CheckoutClient
+
+    @classmethod
+    def create(cls, **params):
+        return cls.get_client().create_session(**params)
