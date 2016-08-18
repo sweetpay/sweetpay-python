@@ -27,7 +27,7 @@ setup(
     license="Apache 2",
     keywords="sweetpay checkout payment",
     url="https://github.com/sweetpay/sweetpay-python",
-    download_url="https://github.com/sweetpoay/sweetpay-python/tarball/%s" % __version__,
+    download_url="https://github.com/sweetpay/sweetpay-python/tarball/%s" % __version__,
     packages=["sweetpay"],
     install_requires=["marshmallow==2.9.0", "requests==2.10.0"],
     long_description="Coming soon",
