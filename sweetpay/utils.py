@@ -204,35 +204,30 @@ class BaseClient(object):
 
         try:
             # Try to decode the (hopefully) JSON response
-            data = resp.json()
+            respdata = resp.json()
         except (TypeError, ValueError):
             logger.error("Could not deserialize JSON for request "
                          "to url=%s, response=%s", url, resp.text)
             data = None
             status = None
         else:
-            # TODO: Remove hack
-            # We do this because the API sometimes return a string
-            # as the data, and a string obviously can't have a status.
-            if isinstance(data, dict):
-                # Let's deserialize the data to Python objects.
-                data = respschema.load(data).data
+            # TODO: What happens if this is an error?
+            # Let's deserialize the data to Python objects.
+            data = respschema.load(respdata).data
 
-                # Now it's time to extract the status. If no status was
-                # passed, an error will be raised as that shouldn't
-                # be possible.
-                try:
-                    status = data["status"]
-                except KeyError:
-                    # We throw a general error here as this isn't
-                    # supposed to happen.
-                    raise SweetpayError("No status was passed from Sweetpay, "
-                                        "even though the JSON was valid. This "
-                                        "is most likely an error "
-                                        "in Sweetpay's API", code=code,
-                                        status=None, data=data, response=resp)
-            else:
+            # Now it's time to extract the status. If no status was
+            # passed, an error will be raised as that shouldn't
+            # be possible.
+            try:
+                status = data["status"]
+            except KeyError:
+                # No status was found
                 status = None
+                # TODO: Remove hack, must be expected data
+                # If no data was deserialized, something unexpected
+                # was returned from the server.
+                if not data:
+                    data = respdata
 
         # Check if the response was successful.
         if code == 200:
@@ -243,6 +238,7 @@ class BaseClient(object):
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {"code": code, "response": resp, "status": status,
                       "data": data}
+        # Start checking for errors
         # Bad Data
         if code == 400:
             raise BadDataError("The data passed to the server "
@@ -262,7 +258,8 @@ class BaseClient(object):
         elif code == 422:
             raise InvalidParameterError("You passed in an invalid "
                                         "parameter or missed a parameter"
-                                        "parameter, response data={0}".format(data),
+                                        "parameter, "
+                                        "response data={0}".format(data),
                                         **exc_kwargs)
         # Internal Server Error
         elif code == 500:

@@ -6,6 +6,5 @@ from .checkout import *
 from .subscription import *
 from .creditcheck import *
 from .utils import configure
-from requests import RequestException
 
 logger = logging.Logger("sweetpay-sdk")
