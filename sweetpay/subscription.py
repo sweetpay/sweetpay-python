@@ -71,20 +71,35 @@ class SubscriptionSchema(BaseSchema):
     customer = fields.Nested(CustomerSchema, load_only=True)
 
 
-class EnvelopeSchema(BaseSchema):
-    """The Schema representing the Envelope object"""
+class LogSchema(BaseSchema):
+    created_at = fields.DateTime(load_from="createdAt")
+    event = fields.String()
+    execution = fields.Integer()
+    reservation_id = fields.Integer(load_from="reservationId")
+    session_id = fields.UUID(load_from="sessionId")
+
+
+class BaseEnvelopeSchema(BaseSchema):
+    """The base schema representing the Envelope object"""
     created_at = fields.DateTime(load_from="createdAt")
     status = fields.String()
     payload = fields.Nested(SubscriptionSchema)
     version = fields.String()
 
 
-class SearchEnvelopeSchema(BaseSchema):
+class EnvelopeSchema(BaseEnvelopeSchema):
     """The Schema representing the Envelope object"""
-    created_at = fields.DateTime(load_from="createdAt")
-    status = fields.String()
+    payload = fields.Nested(SubscriptionSchema)
+
+
+class SearchEnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Envelope object"""
     payload = fields.Nested(SubscriptionSchema, many=True)
-    version = fields.String()
+
+
+class LogEnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Envelope object"""
+    payload = fields.Nested(LogSchema, many=True)
 
 
 class CallbackEnvelope(BaseSchema):
@@ -186,12 +201,13 @@ class SubscriptionClient(BaseClient):
         return self.make_request(url, "GET", EnvelopeSchema())
 
     def update_subscription(self, subscription_id, **params):
-        """Update a subscription"""
+        """Update a subscription."""
         url = self.build_url(str(subscription_id), "update")
         return self.make_request(url, "POST", EnvelopeSchema(), 
                                  UpdateSubscriptionSchema, params)
 
     def query_subscription(self, subscription_id):
+        """Query a subscription."""
         url = self.build_url(str(subscription_id), "query")
         return self.make_request(url, "GET", EnvelopeSchema())
     
@@ -200,6 +216,10 @@ class SubscriptionClient(BaseClient):
         url = self.build_url("search")
         return self.make_request(url, "POST", SearchEnvelopeSchema(), 
                                  SearchSubscriptionRequestSchema, params)
+
+    def log_subscription(self, subscription_id):
+        url = self.build_url(str(subscription_id), "log")
+        return self.make_request(url, "GET", LogEnvelopeSchema())
 
 
 def deserialize_callback_data(data, is_json_str=False):
@@ -234,6 +254,10 @@ class Subscription(BaseResource):
     @classmethod
     def search(cls, *args, **kwargs):
         return cls.get_client().search_subscription(*args, **kwargs)
+
+    @classmethod
+    def list_log(cls, *args, **kwargs):
+        return cls.get_client().log_subscription(*args, **kwargs)
 
     @classmethod
     def regret(cls, *args, **kwargs):
