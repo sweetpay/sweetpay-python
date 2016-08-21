@@ -38,8 +38,8 @@ class ResponseClass(object):
 
     def __repr__(self):
         return u"<ResponseClass: code={0}, status={1}, " \
-               u"response={2}, data={3}>".format(self.code, self.status,
-                                                 self.response, self.data)
+               u"response={2}, data=(...)>".format(self.code, self.status,
+                                                   self.response)
 
 
 class BaseResource(object):
