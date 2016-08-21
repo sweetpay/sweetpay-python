@@ -27,7 +27,7 @@ class SweetpayError(Exception):
 
     def __init__(self, msg, data=None, response=None, code=None,
                  status=None, exc=None):
-        Exception.__init__(self, msg)
+        super(SweetpayError, self).__init__(self, msg)
         self.data = data
         self.response = response
         self.code = code
@@ -66,3 +66,9 @@ class RequestError(SweetpayError):
 
 class TimeoutError(RequestError):
     """Raised when a timeout occurs"""
+
+
+# This is cast instead of TypeError because we want to include the
+# data from marshmallow.
+class InvalidArgumentError(SweetpayError):
+    """An invalid parameter was passed."""

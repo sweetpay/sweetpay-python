@@ -12,12 +12,12 @@ from collections import namedtuple
 from decimal import Decimal
 
 import requests
-from marshmallow import Schema
+from marshmallow import Schema, ValidationError
 from requests import Session
 
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
-    NotFoundError, TimeoutError, RequestError
+    NotFoundError, TimeoutError, RequestError, InvalidArgumentError
 
 class ResponseClass(object):
     """The response class returning response data from API calls."""
@@ -87,10 +87,10 @@ class BaseResource(object):
             return retval
 
         # Set some shortcuts
-        code = resp.code
+        code = retval.code
         resp = retval.response
-        status = resp.status
-        data = resp.data
+        status = retval.status
+        data = retval.data
 
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {"code": code, "response": resp, "status": status,
@@ -259,6 +259,7 @@ class BaseClient(object):
                 deserialization, and then pass on to the server.
         :param respschema: The schema to use for deserialization.
         :param params: The parameters passed by the client.
+        :param InvalidParameterError: T
         :raise TimeoutError: If a request timeout occurred.
         :raise RequestError: If an unhandled request error occurred.
         :return: Return a dictionary with the keys "response",
@@ -277,8 +278,12 @@ class BaseClient(object):
         if method == "get":
             logger.info("Sending request with method=GET to url=%s", url)
         elif method == "post":
-            # TODO: Catch exception
-            to_dump = reqschema().dump(params).data
+            # Try to create the request parameters.
+            try:
+                to_dump = reqschema(strict=True).dump(params).data
+            except ValidationError as e:
+                raise InvalidArgumentError("An invalid parameters was passed", exc=e)
+
             # Encode the data to JSON
             reqdata = SweetpayJSONEncoder().encode(to_dump)
             # Log the progress
