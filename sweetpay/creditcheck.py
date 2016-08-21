@@ -157,8 +157,8 @@ class Creditcheck(BaseResource):
 
     @classmethod
     def create(cls, **params):
-        return cls.get_client().make_check(**params)
+        return cls.make_request("make_check", *args, **params)
 
     @classmethod
-    def search(cls, **params):
-        return cls.get_client().search_checks(**params)
+    def search(cls, *args, **params):
+        return cls.make_request("search_checks", *args, **params)

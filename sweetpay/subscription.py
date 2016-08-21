@@ -192,7 +192,7 @@ class SubscriptionClient(BaseClient):
     def create_subscription(self, **params):
         """Create a subscription."""
         url = self.build_url("create")
-        return self.make_request(url, "POST", EnvelopeSchema(), 
+        return self.make_request(url, "POST", EnvelopeSchema(),
                                  CreateSubscriptionRequestSchema, params)
 
     def regret_subscription(self, subscription_id):
@@ -203,18 +203,18 @@ class SubscriptionClient(BaseClient):
     def update_subscription(self, subscription_id, **params):
         """Update a subscription."""
         url = self.build_url(str(subscription_id), "update")
-        return self.make_request(url, "POST", EnvelopeSchema(), 
+        return self.make_request(url, "POST", EnvelopeSchema(),
                                  UpdateSubscriptionSchema, params)
 
     def query_subscription(self, subscription_id):
         """Query a subscription."""
         url = self.build_url(str(subscription_id), "query")
         return self.make_request(url, "GET", EnvelopeSchema())
-    
-    def search_subscription(self, **params):
+
+    def search_subscriptions(self, **params):
         """Search for subscriptions."""
         url = self.build_url("search")
-        return self.make_request(url, "POST", SearchEnvelopeSchema(), 
+        return self.make_request(url, "POST", SearchEnvelopeSchema(),
                                  SearchSubscriptionRequestSchema, params)
 
     def log_subscription(self, subscription_id):
@@ -240,25 +240,31 @@ class Subscription(BaseResource):
     CLIENT_CLS = SubscriptionClient
 
     @classmethod
-    def create(cls, *args, **kwargs):
-        return cls.get_client().create_subscription(*args, **kwargs)
+    def create(cls, *args, **params):
+        """Create a subscription."""
+        return cls.make_request("create_subscription", *args, **params)
 
     @classmethod
-    def get(cls, *args, **kwargs):
-        return cls.get_client().query_subscription(*args, **kwargs)
+    def query(cls, *args, **params):
+        """Query a subscription for information."""
+        return cls.make_request("query_subscription", *args, **params)
 
     @classmethod
-    def update(cls, *args, **kwargs):
-        return cls.get_client().update(*args, **kwargs)
+    def update(cls, *args, **params):
+        """Update a subscription."""
+        return cls.make_request("update", *args, **params)
 
     @classmethod
-    def search(cls, *args, **kwargs):
-        return cls.get_client().search_subscription(*args, **kwargs)
+    def search(cls, *args, **params):
+        """Search for subscriptions."""
+        return cls.make_request("search_subscriptions", *args, **params)
 
     @classmethod
-    def list_log(cls, *args, **kwargs):
-        return cls.get_client().log_subscription(*args, **kwargs)
+    def list_log(cls, *args, **params):
+        """List all of the log entries."""
+        return cls.make_request("log_subscription", *args, **params)
 
     @classmethod
-    def regret(cls, *args, **kwargs):
-        return cls.get_client().regret_subscription(*args, **kwargs)
+    def regret(cls, *args, **params):
+        """Regret a subscription."""
+        return cls.make_request("regret_subscription", *args, **params)

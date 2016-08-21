@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Helper functions and base classes.
+"""
 
 import json
 import datetime
@@ -16,8 +19,27 @@ from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError
 
-ResponseClass = namedtuple("ResponseClass",
-                           ["response", "code", "data", "status"])
+class ResponseClass(object):
+    """The response class returning response data from API calls."""
+
+    def __init__(self, response, code, data, status):
+        """Init the class.
+
+        :param response: The requests response object.
+        :param code: The HTTP status code.
+        :param data: The JSON decoded data.
+        :param status: The status from Paylevo.
+        """
+        super(ResponseClass, self).__init__()
+        self.response = response
+        self.code = code
+        self.data = data
+        self.status = status
+
+    def __repr__(self):
+        return u"<ResponseClass: code={0}, status={1}, " \
+               u"response={2}, data={3}>".format(self.code, self.status,
+                                                 self.response, self.data)
 
 
 class BaseResource(object):
@@ -29,13 +51,106 @@ class BaseResource(object):
     timeout = None
 
     @classmethod
-    def get_client(cls):
-        if not cls.api_token or not cls.stage:
+    def make_request(self, cls_method, api_token=None, **params):
+        """Make request through the specified client's method.
+
+        :param cls_method: The method from the client to use.
+        :param api_token: An optional API token the caller can
+                          specify to override the configured one.
+        :param **params: The params to pass to the API endpoint.
+
+        :raise BadDataError: If the HTTP status code is 400
+        :raise InvalidParameterError: If the HTTP status code is 422
+        :raise InternalServerError: If an internal server error occurred
+                                    at Sweetpay.
+        :raise UnauthorizedError: If the API token was invalid.
+        :raise NotFoundError: If the requested resource couldn't be found.
+        :raise UnderMaintenanceError: If the server is currently
+                                      under maintenance.
+        :raise TimeoutError: If a request timeout occurred.
+        :raise RequestError: If an unhandled request error occurred.
+        :return: A request object.
+        """
+        # TODO: Expand with stage and version?
+        # The client to make the request with, pass in the API token.
+        client = self.get_client(api_token)
+
+        # Call the actual method. Note that this may raise an AttributeErorr if
+        # if the method doesn't exist, but we let that bubble up. It may also
+        # raise a RequestError, but as that is a subclass of SweetpayError we
+        # let that bubble up as well.
+        method_callable = getattr(client, cls_method)
+        retval = method_callable(**params)
+
+        # Check if the response was successful. If so, just return the retval.
+        if retval.code == 200:
+            return retval
+
+        # Set some shortcuts
+        code = resp.code
+        resp = retval.response
+        status = resp.status
+        data = resp.data
+
+        # The standard kwargs to send to the exception when raised
+        exc_kwargs = {"code": code, "response": resp, "status": status,
+                      "data": data}
+
+        # Start checking for errors
+        # Bad Data
+        if code == 400:
+            raise BadDataError("The data passed to the server "
+                               "contained bad data. This most likely means "
+                               "that you missed to send some parameters, "
+                               "response data={0}".format(data),
+                               **exc_kwargs)
+        # Unauthorized
+        elif code == 401:
+            raise UnauthorizedError("The passed API token was invalid",
+                                    **exc_kwargs)
+        # Not Found
+        elif code == 404:
+            raise NotFoundError("The resource you were looking for couldn't "
+                                "be found", **exc_kwargs)
+        # Unprocessable Entity
+        elif code == 422:
+            raise InvalidParameterError("You passed in an invalid "
+                                        "parameter or missed a parameter"
+                                        "parameter, "
+                                        "response data={0}".format(data),
+                                        **exc_kwargs)
+        # Internal Server Error
+        elif code == 500:
+            raise InternalServerError("An internal server occurred",
+                                      **exc_kwargs)
+        # Under Maintenance
+        elif code == 503:
+            raise UnderMaintenanceError("The server is currently under"
+                                        "maintenance and can't be contacted",
+                                        **exc_kwargs)
+        # Something else happened, just throw a general error.
+        else:
+            raise SweetpayError("Something went wrong in the request",
+                                **exc_kwargs)
+
+    @classmethod
+    def get_client(cls, api_token=None):
+        """Return an instantied client, based on the CLIENT_CLS.
+
+        :param api_token: An optional api_token to override the configured one.
+        :return: An instantiated client.
+        """
+        if api_token is None:
+            api_token = cls.api_token
+        version = cls.version
+        stage = cls.stage
+        # Check if api_token and stage is set, if not, raise an error
+        if api_token is None or stage is None:
             raise ValueError("You must set an API token and decide whether "
                              "to use the stage environment or not before "
                              "using the SDK. Have a look at "
                              "`sweetpay.configure`")
-        return cls.CLIENT_CLS(cls.api_token, cls.stage, cls.version)
+        return cls.CLIENT_CLS(api_token, stage, version)
 
 
 def configure(api_token, stage, version=None, timeout=None):
@@ -45,7 +160,7 @@ def configure(api_token, stage, version=None, timeout=None):
     :param stage: A boolean indicating whether to use the stage
                   or production environment.
     :param version: An integer or string indicating which version
-                    of the API to use. For example: 1
+                    of the API to use.
     :param timeout: The request timeout, defaults to
     :return: None
     """
@@ -144,14 +259,6 @@ class BaseClient(object):
                 deserialization, and then pass on to the server.
         :param respschema: The schema to use for deserialization.
         :param params: The parameters passed by the client.
-        :raise BadDataError: If the HTTP status code is 400
-        :raise InvalidParameterError: If the HTTP status code is 422
-        :raise InternalServerError: If an internal server error occurred
-                                    at Sweetpay.
-        :raise UnauthorizedError: If the API token was invalid.
-        :raise NotFoundError: If the requested resource couldn't be found.
-        :raise UnderMaintenanceError: If the server is currently
-                                      under maintenance.
         :raise TimeoutError: If a request timeout occurred.
         :raise RequestError: If an unhandled request error occurred.
         :return: Return a dictionary with the keys "response",
@@ -164,7 +271,6 @@ class BaseClient(object):
         method = method.lower()
 
         # Set default values for the request args and kwargs.
-        reqargs = [url]
         reqkwargs = {"timeout": self.timeout}
 
         # Handle the method types appropriately
@@ -185,9 +291,8 @@ class BaseClient(object):
                              "not method=%s", method)
 
         # Send the actual response
-        response_func = getattr(self.session, method)
         try:
-            resp = response_func(*reqargs, **reqkwargs)
+            resp = self.session.request(method=method, url=url, **reqkwargs)
         except requests.Timeout as e:
             # If the request timed out.
             raise TimeoutError("The request timed out", code=None, status=None,
@@ -229,51 +334,9 @@ class BaseClient(object):
                 if not data:
                     data = respdata
 
-        # Check if the response was successful.
-        if code == 200:
-            # Return a response class
-            return ResponseClass(response=resp, code=resp.status_code,
-                                 data=data, status=status)
+        return ResponseClass(response=resp, code=resp.status_code,
+                             data=data, status=status)
 
-        # The standard kwargs to send to the exception when raised
-        exc_kwargs = {"code": code, "response": resp, "status": status,
-                      "data": data}
-        # Start checking for errors
-        # Bad Data
-        if code == 400:
-            raise BadDataError("The data passed to the server "
-                               "contained bad data. This most likely means "
-                               "that you missed to send some parameters, "
-                               "response data={0}".format(data),
-                               **exc_kwargs)
-        # Unauthorized
-        elif code == 401:
-            raise UnauthorizedError("The passed API token was invalid",
-                                    **exc_kwargs)
-        # Not Found
-        elif code == 404:
-            raise NotFoundError("The resource you were looking for couldn't "
-                                "be found", **exc_kwargs)
-        # Unprocessable Entity
-        elif code == 422:
-            raise InvalidParameterError("You passed in an invalid "
-                                        "parameter or missed a parameter"
-                                        "parameter, "
-                                        "response data={0}".format(data),
-                                        **exc_kwargs)
-        # Internal Server Error
-        elif code == 500:
-            raise InternalServerError("An internal server occurred",
-                                      **exc_kwargs)
-        # Under Maintenance
-        elif code == 503:
-            raise UnderMaintenanceError("The server is currently under"
-                                        "maintenance and can't be contacted",
-                                        **exc_kwargs)
-        # Something else happened, just throw a general error.
-        else:
-            raise SweetpayError("Something went wrong in the request",
-                                **exc_kwargs)
 
     def __repr__(self):
         return u"<{0}: stage={1}, version={2}>".format(type(self).__name__,

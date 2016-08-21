@@ -2,6 +2,7 @@
 
 
 class SweetpayError(Exception):
+    """The base Sweetpay exception."""
 
     # The JSON decoded data from the server. None if the JSON
     # couldn't be decoded.
@@ -19,16 +20,23 @@ class SweetpayError(Exception):
     # returned from the server.
     status = None
 
-    def __init__(self, msg, data, response, code, status):
+    # This is a link to the requests exception that triggered
+    # this error. Check this attribute if you want to see what kind
+    # of request error occurred (e.g. a timeout).
+    exc = None
+
+    def __init__(self, msg, data=None, response=None, code=None,
+                 status=None, exc=None):
         Exception.__init__(self, msg)
         self.data = data
         self.response = response
         self.code = code
         self.status = status
+        self.exc = exc
 
 
 class BadDataError(SweetpayError):
-    pass
+    """If bad data was passed to the server"""
 
 
 class InvalidParameterError(SweetpayError):
@@ -36,32 +44,25 @@ class InvalidParameterError(SweetpayError):
 
 
 class InternalServerError(SweetpayError):
-    pass
+    """Raised if an internal server error occurred."""
 
 
 class UnauthorizedError(SweetpayError):
-    pass
+    """Raised if you configured an invalid API token or are forbidden to
+    access an API"""
 
 
 class NotFoundError(SweetpayError):
-    pass
+    """Raised if the resource you were looking for couldn't be found."""
 
 
 class UnderMaintenanceError(SweetpayError):
-    pass
+    """Raised if the server is under maintenance"""
 
 
 class RequestError(SweetpayError):
-
-    # This is a link to the requests exception that triggered
-    # this error. Check this attribute if you want to see what kind
-    # of request error occurred (e.g. a timeout).
-    exc = None
-
-    def __init__(self, *args, exc=None, **kwargs):
-        SweetpayError.__init__(self, *args, **kwargs)
-        self.exc = exc
+    """The base exception to bubble requests.RequestException"""
 
 
 class TimeoutError(RequestError):
-    pass
+    """Raised when a timeout occurs"""
