@@ -19,6 +19,7 @@ from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError, InvalidArgumentError
 
+
 class ResponseClass(object):
     """The response class returning response data from API calls."""
 
@@ -51,7 +52,7 @@ class BaseResource(object):
     timeout = None
 
     @classmethod
-    def make_request(self, cls_method, api_token=None, **params):
+    def make_request(self, cls_method, *args, **params):
         """Make request through the specified client's method.
 
         :param cls_method: The method from the client to use.
@@ -73,14 +74,14 @@ class BaseResource(object):
         """
         # TODO: Expand with stage and version?
         # The client to make the request with, pass in the API token.
-        client = self.get_client(api_token)
+        client = self.get_client(params.pop("api_token"))
 
         # Call the actual method. Note that this may raise an AttributeErorr if
         # if the method doesn't exist, but we let that bubble up. It may also
         # raise a RequestError, but as that is a subclass of SweetpayError we
         # let that bubble up as well.
         method_callable = getattr(client, cls_method)
-        retval = method_callable(**params)
+        retval = method_callable(*args, **params)
 
         # Check if the response was successful. If so, just return the retval.
         if retval.code == 200:
@@ -301,7 +302,7 @@ class BaseClient(object):
         except requests.Timeout as e:
             # If the request timed out.
             raise TimeoutError("The request timed out", code=None, status=None,
-                               respone=None, exc=e)
+                               response=None, exc=e)
         except requests.RequestException as e:
             # If another request error occurred.
             raise RequestError("Could not send a request to the server",

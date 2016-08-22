@@ -45,11 +45,20 @@ class CreditSchema(BaseSchema):
     statuses = fields.List(fields.String())
 
 
+class MoneySchema(BaseSchema):
+    amount = fields.Decimal()
+    currency = fields.String()
+
+
 class LogEntrySchema(BaseSchema):
+    operator_id = fields.String(load_from="operatorId")
+    merchant_id = fields.String(load_from="merchantId")
+    status = fields.String()
+
     created_at = fields.DateTime(load_from="createdAt")
     customer_id = fields.Integer(load_from="customerId")
     decision = fields.String()
-    limit = fields.Decimal()
+    limit = fields.Nested(MoneySchema)
     session_id = fields.UUID(load_from="sessionId")
 
 
@@ -62,7 +71,6 @@ class CreditcheckSchema(BaseSchema):
 
 class EnvelopeSchema(BaseSchema):
     """The Schema representing the Envelope object"""
-    created_at = fields.DateTime(load_from="createdAt")
     status = fields.String()
     payload = fields.Nested(CreditcheckSchema)
     version = fields.String()
