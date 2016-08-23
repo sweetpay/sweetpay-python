@@ -130,13 +130,12 @@ class CreditcheckClient(BaseClient):
     @property
     def stage_url(self):
         """Return the stage URL."""
-        return "https://api.stage.kriita.com/creditcheck/v{0}".format(
-            self.version)
+        return "https://api.stage.kriita.com/creditcheck"
 
     @property
     def production_url(self):
         """Return the production URL."""
-        return "https://api.kriita.com/creditcheck/v{0}".format(self.version)
+        return "https://api.kriita.com/creditcheck"
 
     def make_check(self, **params):
         """Make a credit check.
@@ -162,9 +161,10 @@ class Creditcheck(BaseResource):
     """The creditcheck resource."""
 
     CLIENT_CLS = CreditcheckClient
+    namespace = "creditcheck"
 
     @classmethod
-    def create(cls, **params):
+    def create(cls, *args, **params):
         return cls.make_request("make_check", *args, **params)
 
     @classmethod

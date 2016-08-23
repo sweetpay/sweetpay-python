@@ -46,6 +46,8 @@ class ResponseClass(object):
 class BaseResource(object):
     """The base resource."""
     CLIENT_CLS = None
+    namespace = None
+
     api_token = None
     stage = None
     version = None
@@ -151,6 +153,9 @@ class BaseResource(object):
                              "to use the stage environment or not before "
                              "using the SDK. Have a look at "
                              "`sweetpay.configure`")
+        # Get the version or nothing.
+        if isinstance(version, dict):
+            version = version[cls.namespace]
         return cls.CLIENT_CLS(api_token, stage, version)
 
 
@@ -239,9 +244,10 @@ class BaseClient(object):
     def url(self):
         """Return the stage or production URL, depending on the settings."""
         if self.stage:
-            return self.stage_url
+            url = self.stage_url
         else:
-            return self.production_url
+            url = self.production_url
+        return os.path.join(url, "v{0}".format(self.version))
 
     def build_url(self, *args):
         """Return a URL based on
