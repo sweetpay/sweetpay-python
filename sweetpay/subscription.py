@@ -180,14 +180,12 @@ class SubscriptionClient(BaseClient):
     @property
     def stage_url(self):
         """Return the stage URL."""
-        return "https://api.stage.kriita.com/subscription/" \
-               "v{0}".format(self.version)
+        return "https://api.stage.kriita.com/subscription"
 
     @property
     def production_url(self):
         """Return the production URL."""
-        return "https://api.kriita.com/subscription" \
-               "/v{0}".format(self.version)
+        return "https://api.kriita.com/subscription"
 
     def create_subscription(self, **params):
         """Create a subscription."""
@@ -238,6 +236,7 @@ class Subscription(BaseResource):
     """The subscription resource."""
 
     CLIENT_CLS = SubscriptionClient
+    namespace = "subscription"
 
     @classmethod
     def create(cls, *args, **params):
