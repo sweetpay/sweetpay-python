@@ -9,4 +9,5 @@ if __name__ == "__main__":
     import sweetpay
     from sweetpay import Subscription, CheckoutSession, Creditcheck
     from datetime import date, datetime
-    sweetpay.configure("paylevo", True)
+    sweetpay.configure(
+        "paylevo", True, version={"subscription": 1, "creditcheck": 2})

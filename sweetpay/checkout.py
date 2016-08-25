@@ -174,22 +174,14 @@ class CheckoutClient(BaseClient):
     """The client used to connect to the checkout API"""
 
     @property
-    def url(self):
-        """Return the stage or production URL, depending on the settings."""
-        if self.stage:
-            return self.stage_url
-        else:
-            return self.production_url
-
-    @property
     def stage_url(self):
         """Return the stage URL."""
-        return "https://checkout.stage.paylevo.com/v{0}".format(self.version)
+        return "https://checkout.stage.paylevo.com"
 
     @property
     def production_url(self):
         """Return the production URL."""
-        return "https://checkout.paylevo.com/v{0}".format(self.version)
+        return "https://checkout.paylevo.com"
 
     def create_session(self, **params):
         """Create a checkout session.
@@ -211,6 +203,7 @@ class CheckoutSession(BaseResource):
     """The checkout session resource."""
 
     CLIENT_CLS = CheckoutClient
+    namespace = "checkout"
 
     @classmethod
     def create(cls, *args, **params):

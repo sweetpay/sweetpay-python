@@ -45,11 +45,20 @@ class CreditSchema(BaseSchema):
     statuses = fields.List(fields.String())
 
 
+class MoneySchema(BaseSchema):
+    amount = fields.Decimal()
+    currency = fields.String()
+
+
 class LogEntrySchema(BaseSchema):
+    operator_id = fields.String(load_from="operatorId")
+    merchant_id = fields.String(load_from="merchantId")
+    status = fields.String()
+
     created_at = fields.DateTime(load_from="createdAt")
     customer_id = fields.Integer(load_from="customerId")
     decision = fields.String()
-    limit = fields.Decimal()
+    limit = fields.Nested(MoneySchema)
     session_id = fields.UUID(load_from="sessionId")
 
 
@@ -60,12 +69,20 @@ class CreditcheckSchema(BaseSchema):
     customer = fields.Nested(CustomerSchema)
 
 
-class EnvelopeSchema(BaseSchema):
-    """The Schema representing the Envelope object"""
-    created_at = fields.DateTime(load_from="createdAt")
+class BaseEnvelopeSchema(BaseSchema):
+    """The schema representing the base Envelope object"""
     status = fields.String()
-    payload = fields.Nested(CreditcheckSchema)
     version = fields.String()
+
+
+class EnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Envelope object"""
+    payload = fields.Nested(CreditcheckSchema)
+
+
+class SearchEnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Search Envelope object"""
+    payload = fields.Nested(CreditcheckSchema, many=True)
 
 
 class CreditcheckRequestSchema(BaseSchema):
@@ -112,23 +129,14 @@ class CreditcheckClient(BaseClient):
     """The client used to connect to the creditcheck API"""
 
     @property
-    def url(self):
-        """Return the stage or production URL, depending on the settings."""
-        if self.stage:
-            return self.stage_url
-        else:
-            return self.production_url
-
-    @property
     def stage_url(self):
         """Return the stage URL."""
-        return "https://api.stage.kriita.com/creditcheck/v{0}".format(
-            self.version)
+        return "https://api.stage.kriita.com/creditcheck"
 
     @property
     def production_url(self):
         """Return the production URL."""
-        return "https://api.kriita.com/creditcheck/v{0}".format(self.version)
+        return "https://api.kriita.com/creditcheck"
 
     def make_check(self, **params):
         """Make a credit check.
@@ -145,8 +153,8 @@ class CreditcheckClient(BaseClient):
                                  CreditcheckRequestSchema, params)
 
     def search_checks(self, **params):
-        url = self.build_url("log")
-        return self.make_request(url, "POST", EnvelopeSchema(),
+        url = self.build_url("search")
+        return self.make_request(url, "POST", SearchEnvelopeSchema(),
                                  CreditcheckSearchRequestSchema, params)
 
 
@@ -154,9 +162,10 @@ class Creditcheck(BaseResource):
     """The creditcheck resource."""
 
     CLIENT_CLS = CreditcheckClient
+    namespace = "creditcheck"
 
     @classmethod
-    def create(cls, **params):
+    def create(cls, *args, **params):
         return cls.make_request("make_check", *args, **params)
 
     @classmethod

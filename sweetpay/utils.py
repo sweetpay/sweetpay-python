@@ -19,6 +19,7 @@ from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError, InvalidArgumentError
 
+
 class ResponseClass(object):
     """The response class returning response data from API calls."""
 
@@ -45,13 +46,15 @@ class ResponseClass(object):
 class BaseResource(object):
     """The base resource."""
     CLIENT_CLS = None
+    namespace = None
+
     api_token = None
     stage = None
     version = None
     timeout = None
 
     @classmethod
-    def make_request(self, cls_method, api_token=None, **params):
+    def make_request(self, cls_method, *args, **params):
         """Make request through the specified client's method.
 
         :param cls_method: The method from the client to use.
@@ -73,14 +76,14 @@ class BaseResource(object):
         """
         # TODO: Expand with stage and version?
         # The client to make the request with, pass in the API token.
-        client = self.get_client(api_token)
+        client = self.get_client(params.pop("api_token", None))
 
         # Call the actual method. Note that this may raise an AttributeErorr if
         # if the method doesn't exist, but we let that bubble up. It may also
         # raise a RequestError, but as that is a subclass of SweetpayError we
         # let that bubble up as well.
         method_callable = getattr(client, cls_method)
-        retval = method_callable(**params)
+        retval = method_callable(*args, **params)
 
         # Check if the response was successful. If so, just return the retval.
         if retval.code == 200:
@@ -150,6 +153,9 @@ class BaseResource(object):
                              "to use the stage environment or not before "
                              "using the SDK. Have a look at "
                              "`sweetpay.configure`")
+        # Get the version or nothing.
+        if isinstance(version, dict):
+            version = version[cls.namespace]
         return cls.CLIENT_CLS(api_token, stage, version)
 
 
@@ -238,9 +244,11 @@ class BaseClient(object):
     def url(self):
         """Return the stage or production URL, depending on the settings."""
         if self.stage:
-            return self.stage_url
+            url = self.stage_url
         else:
-            return self.production_url
+            url = self.production_url
+        url = os.path.join(url, "v{0}".format(self.version))
+        return url
 
     def build_url(self, *args):
         """Return a URL based on
@@ -301,7 +309,7 @@ class BaseClient(object):
         except requests.Timeout as e:
             # If the request timed out.
             raise TimeoutError("The request timed out", code=None, status=None,
-                               respone=None, exc=e)
+                               response=None, exc=e)
         except requests.RequestException as e:
             # If another request error occurred.
             raise RequestError("Could not send a request to the server",
