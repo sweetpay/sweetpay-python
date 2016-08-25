@@ -76,7 +76,7 @@ class BaseResource(object):
         """
         # TODO: Expand with stage and version?
         # The client to make the request with, pass in the API token.
-        client = self.get_client(params.pop("api_token"))
+        client = self.get_client(params.pop("api_token", None))
 
         # Call the actual method. Note that this may raise an AttributeErorr if
         # if the method doesn't exist, but we let that bubble up. It may also
@@ -247,7 +247,8 @@ class BaseClient(object):
             url = self.stage_url
         else:
             url = self.production_url
-        return os.path.join(url, "v{0}".format(self.version))
+        url = os.path.join(url, "v{0}".format(self.version))
+        return url
 
     def build_url(self, *args):
         """Return a URL based on

@@ -69,11 +69,20 @@ class CreditcheckSchema(BaseSchema):
     customer = fields.Nested(CustomerSchema)
 
 
-class EnvelopeSchema(BaseSchema):
-    """The Schema representing the Envelope object"""
+class BaseEnvelopeSchema(BaseSchema):
+    """The schema representing the base Envelope object"""
     status = fields.String()
-    payload = fields.Nested(CreditcheckSchema)
     version = fields.String()
+
+
+class EnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Envelope object"""
+    payload = fields.Nested(CreditcheckSchema)
+
+
+class SearchEnvelopeSchema(BaseEnvelopeSchema):
+    """The Schema representing the Search Envelope object"""
+    payload = fields.Nested(CreditcheckSchema, many=True)
 
 
 class CreditcheckRequestSchema(BaseSchema):
@@ -120,14 +129,6 @@ class CreditcheckClient(BaseClient):
     """The client used to connect to the creditcheck API"""
 
     @property
-    def url(self):
-        """Return the stage or production URL, depending on the settings."""
-        if self.stage:
-            return self.stage_url
-        else:
-            return self.production_url
-
-    @property
     def stage_url(self):
         """Return the stage URL."""
         return "https://api.stage.kriita.com/creditcheck"
@@ -152,8 +153,8 @@ class CreditcheckClient(BaseClient):
                                  CreditcheckRequestSchema, params)
 
     def search_checks(self, **params):
-        url = self.build_url("log")
-        return self.make_request(url, "POST", EnvelopeSchema(),
+        url = self.build_url("search")
+        return self.make_request(url, "POST", SearchEnvelopeSchema(),
                                  CreditcheckSearchRequestSchema, params)
 
 
