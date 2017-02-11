@@ -45,11 +45,16 @@ class CreditSchema(BaseSchema):
     statuses = fields.List(fields.String())
 
 
+class MoneySchema(BaseSchema):
+    amount = fields.Decimal()
+    currency = fields.String()
+
+
 class LogEntrySchema(BaseSchema):
     created_at = fields.DateTime(load_from="createdAt")
     customer_id = fields.Integer(load_from="customerId")
     decision = fields.String()
-    limit = fields.Decimal()
+    limit = fields.Nested(MoneySchema)
     session_id = fields.UUID(load_from="sessionId")
 
 
@@ -156,7 +161,7 @@ class Creditcheck(BaseResource):
     CLIENT_CLS = CreditcheckClient
 
     @classmethod
-    def create(cls, **params):
+    def create(cls, *args, **params):
         return cls.make_request("make_check", *args, **params)
 
     @classmethod
