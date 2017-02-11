@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
-from sweetpay.constants import LOGGER_NAME
+from .constants import LOGGER_NAME
 from .checkout import CheckoutSession
 from .subscription import Subscription
 from .creditcheck import Creditcheck
