@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import logging
 
 # Importing * is usually a death sin, but we justify it here by

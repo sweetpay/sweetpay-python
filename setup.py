@@ -1,9 +1,4 @@
-"""
-Copyright (C) 2015 David Buresund - All Rights Reserved
-Unauthorized copying of this file, via any medium is strictly prohibited
-Proprietary and confidential
-Written by David Buresund <david.buresund@gmail.com>, September 2015
-"""
+
 
 import os
 from setuptools import setup
@@ -31,5 +26,5 @@ setup(
     download_url="https://github.com/sweetpay/sweetpay-"
                  "python/tarball/%s" % __version__,
     packages=["sweetpay"],
-    install_requires=["marshmallow==2.9.0", "requests==2.10.0"]
+    install_requires=["requests==2.10.0"]
 )

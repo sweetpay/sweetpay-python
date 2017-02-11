@@ -34,6 +34,18 @@ class SweetpayError(Exception):
         self.status = status
         self.exc = exc
 
+    @property
+    def request_sent(self):
+        """Return a boolean to indicate if a request was sent to the server.
+
+        This will for example be False in the case of timeouts."""
+        return self.response is not None
+
+    @property
+    def is_json(self):
+        """Return a boolean to indicate if the resp data is JSON."""
+        return self.data is not None
+
 
 class BadDataError(SweetpayError):
     """If bad data was passed to the server"""
@@ -66,9 +78,3 @@ class RequestError(SweetpayError):
 
 class TimeoutError(RequestError):
     """Raised when a timeout occurs"""
-
-
-# This is cast instead of TypeError because we want to include the
-# data from marshmallow.
-class InvalidArgumentError(SweetpayError):
-    """An invalid parameter was passed."""

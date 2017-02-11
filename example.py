@@ -1,13 +1,10 @@
-"""
-Copyright (C) 2015 David Buresund - All Rights Reserved
-Unauthorized copying of this file, via any medium is strictly prohibited
-Proprietary and confidential
-Written by David Buresund <david.buresund@gmail.com>, September 2015
-"""
+# -*- coding: utf-8 -*-
 
 if __name__ == "__main__":
     import sweetpay
     from sweetpay import Subscription, CheckoutSession, Creditcheck
     from datetime import date, datetime
+
+    version = {"subscription": 1, "creditcheck": 2}
     sweetpay.configure(
-        "paylevo", True, version={"subscription": 1, "creditcheck": 2})
+        "paylevo", True, version=version)
