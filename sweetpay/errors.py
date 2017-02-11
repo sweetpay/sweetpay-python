@@ -47,6 +47,14 @@ class SweetpayError(Exception):
         return self.data is not None
 
 
+class FailureStatusError(SweetpayError):
+    """Raised when the status from the server isn't OK.
+
+    When this status is returned, it means that the
+    request did not succeed with the intended operation.
+    """
+
+
 class BadDataError(SweetpayError):
     """If bad data was passed to the server"""
 

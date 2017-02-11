@@ -17,8 +17,9 @@ from requests import Session
 from .utils import setindict, getfromdict, decode_datetime
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
-    NotFoundError, TimeoutError, RequestError, MethodNotAllowedError
-from .constants import DATE_FORMAT, LOGGER_NAME
+    NotFoundError, TimeoutError, RequestError, MethodNotAllowedError, \
+    FailureStatusError
+from .constants import DATE_FORMAT, LOGGER_NAME, OK_STATUS
 
 __all__ = ["ResponseClass", "BaseClient", "BaseResource"]
 
@@ -270,10 +271,6 @@ class BaseResource(object):
         if data:
             cls.validate_data(data)
 
-        # Check if the response was successful. If so, just return the retval.
-        if retval.code == 200:
-            return retval
-
         # Set some shortcuts
         code = retval.code
         resp = retval.response
@@ -284,6 +281,17 @@ class BaseResource(object):
             "code": code, "response": resp, "status": status,
             "data": data
         }
+
+        # Check if the response was successful.
+        if code == 200:
+            if retval.status == OK_STATUS:
+                # If all OK, return the response class.
+                return retval
+            else:
+                raise FailureStatusError(
+                    "The passed status={0} is not the OK_STATUS={1}, "
+                    "meaning that the requested operation did not "
+                    "succeed".format(retval.status, OK_STATUS), **exc_kwargs)
 
         # Start checking for errors
         if code == 400:
