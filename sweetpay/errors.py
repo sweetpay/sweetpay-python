@@ -51,8 +51,9 @@ class BadDataError(SweetpayError):
     """If bad data was passed to the server"""
 
 
+# TODO: This should be removed
 class InvalidParameterError(SweetpayError):
-    pass
+    """If bad data was passed to the server"""
 
 
 class InternalServerError(SweetpayError):
@@ -61,11 +62,19 @@ class InternalServerError(SweetpayError):
 
 class UnauthorizedError(SweetpayError):
     """Raised if you configured an invalid API token or are forbidden to
-    access an API"""
+    access an API.
+    """
 
 
 class NotFoundError(SweetpayError):
-    """Raised if the resource you were looking for couldn't be found."""
+    """Raised if the resource you were looking for couldn't be found.
+
+    Will also be raised when the API can't find an API endpoint.
+    """
+
+
+class MethodNotAllowedError(SweetpayError):
+    """Raised when a method such as POST is not allowed for an API endpoint."""
 
 
 class UnderMaintenanceError(SweetpayError):
@@ -73,7 +82,7 @@ class UnderMaintenanceError(SweetpayError):
 
 
 class RequestError(SweetpayError):
-    """The base exception to bubble requests.RequestException"""
+    """The base exception to bubble `requests.RequestException`"""
 
 
 class TimeoutError(RequestError):

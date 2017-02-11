@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .utils import BaseClient, BaseResource
+from .base import BaseClient, BaseResource
 
 __all__ = ["CheckoutSession"]
 

@@ -26,5 +26,5 @@ setup(
     download_url="https://github.com/sweetpay/sweetpay-"
                  "python/tarball/%s" % __version__,
     packages=["sweetpay"],
-    install_requires=["requests==2.10.0"]
+    install_requires=["requests==2.10.0", "python-dateutil-2.6.0"]
 )

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .utils import BaseClient, BaseResource
+from .base import BaseClient, BaseResource
 
 __all__ = ["Creditcheck"]
 
@@ -22,8 +22,6 @@ class CreditcheckClient(BaseClient):
 
         :param params: The parameters to pass on to the marshmallow
                 deserialization, and then pass on to the server.
-        :raises: marshmallow.ValidationError if a param is invalid,
-                requests.RequestException if the request fails.
         :returns: Return a dictionary with the keys "response",
                 "status_code", "data" and "raw_data".
         """

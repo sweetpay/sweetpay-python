@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
-from .utils import BaseClient, BaseResource
+from .base import BaseResource, BaseClient
+from .utils import decode_datetime, decode_date
 
 __all__ = ["Subscription"]
 
@@ -26,7 +27,7 @@ class SubscriptionClient(BaseClient):
     def regret_subscription(self, subscription_id):
         """Regret a subscription."""
         url = self.build_url(str(subscription_id), "regret")
-        return self.make_request(url, "GET")
+        return self.make_request(url, "POST")
 
     def update_subscription(self, subscription_id, **params):
         """Update a subscription."""
@@ -93,3 +94,26 @@ class Subscription(BaseResource):
     def regret(cls, *args, **params):
         """Regret a subscription."""
         return cls.make_request("regret_subscription", *args, **params)
+
+
+@Subscription.validates("payload", "startsAt")
+def validate_starts_at(value):
+    if value:
+        return decode_date(value)
+    return value
+
+
+@Subscription.validates("payload", "createdAt")
+def validate_payload_created_at(value):
+    if value:
+        return decode_datetime(value)
+    return value
+
+
+@Subscription.validates("payload")
+def validate_payload_when_list(value):
+    if isinstance(value, list):
+        for sub in value:
+            sub["startsAt"] = decode_datetime(sub["startsAt"])
+            sub["createdAt"] = decode_datetime(sub["createdAt"])
+    return value

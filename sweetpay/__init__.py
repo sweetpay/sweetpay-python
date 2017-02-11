@@ -1,11 +1,26 @@
 # -*- coding: utf-8 -*-
 import logging
 
-# Importing * is usually a death sin, but we justify it here by
-# defining an __all__ in the relevant modules.
 from .checkout import CheckoutSession
 from .subscription import Subscription
 from .creditcheck import Creditcheck
-from .utils import configure
+from .base import BaseResource
 
 logger = logging.Logger("sweetpay-sdk")
+
+
+def configure(api_token, stage, version, timeout=15):
+    """Configure the API with default values.
+
+    :param api_token: The API token provided by SweetPay.
+    :param stage: A boolean indicating whether to use the stage
+                  or production environment.
+    :param version: A mapping/dict indicating which versions of
+                    the APIs to use.
+    :param timeout: The request timeout, defaults to 15.
+
+    """
+    BaseResource.api_token = api_token
+    BaseResource.stage = stage
+    BaseResource.version = version
+    BaseResource.timeout = timeout
