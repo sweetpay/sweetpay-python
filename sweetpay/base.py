@@ -18,7 +18,7 @@ from .utils import setindict, getfromdict, decode_datetime
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError, MethodNotAllowedError
-from .constants import DATE_FORMAT
+from .constants import DATE_FORMAT, LOGGER_NAME
 
 __all__ = ["ResponseClass", "BaseClient", "BaseResource"]
 
@@ -55,9 +55,10 @@ class ResponseClass(object):
         self.status = status
 
     def __repr__(self):
-        return u"<ResponseClass: code={0}, status={1}, " \
-               u"response={2}, data=(...)>".format(self.code, self.status,
-                                                   self.response)
+        return (
+            "<ResponseClass: code={0}, status={1}, "
+            "response={2}, data=(...)>".format(
+                self.code, self.status, self.response))
 
 
 class BaseClient(object):
@@ -73,12 +74,16 @@ class BaseClient(object):
                be used or not. If set to False, the live server will be used.
         :param version: The version number of the API, defaults to 1.
         :param timeout: The request timeout. Defaults to 15 seconds.
+        :param headers: Optional. A dictionary of headers to update the
+                        session headers with.
+        :param session: Optional. An instantiated requests.Session class
+                        to use as the base session.
         """
         self.api_token = api_token
         self.stage = stage
         self.version = version
         self.timeout = timeout
-        self.logger = logging.getLogger("sweetpay-sdk")
+        self.logger = logging.getLogger(LOGGER_NAME)
 
         # The session
         self.session = session or Session()

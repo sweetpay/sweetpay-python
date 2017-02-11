@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import logging
 
+from sweetpay.constants import LOGGER_NAME
 from .checkout import CheckoutSession
 from .subscription import Subscription
 from .creditcheck import Creditcheck
 from .base import BaseResource
+from .utils import decode_datetime, decode_date, decode_attachment, \
+    encode_attachment
 
-logger = logging.Logger("sweetpay-sdk")
+logger = logging.Logger(LOGGER_NAME)
 
 
 def configure(api_token, stage, version, timeout=15):

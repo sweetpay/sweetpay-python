@@ -51,7 +51,6 @@ class BadDataError(SweetpayError):
     """If bad data was passed to the server"""
 
 
-# TODO: This should be removed
 class InvalidParameterError(SweetpayError):
     """If bad data was passed to the server"""
 

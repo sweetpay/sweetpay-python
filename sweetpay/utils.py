@@ -2,7 +2,8 @@
 """
 Helper functions.
 """
-
+import json
+from base64 import b64decode, b64encode
 from functools import reduce
 import operator
 
@@ -42,3 +43,25 @@ def getfromdict(datadict, maplist):
 def setindict(datadict, maplist, value):
     """Set an item in a dict, based on a list of keys."""
     getfromdict(datadict, maplist[:-1])[maplist[-1]] = value
+
+
+def encode_attachment(attachment):
+    """Helper function to encode a Python object to a b64 encoded value.
+
+    This function is supposed to work as a helper, if you feel
+    like specifying a JSON object as an attachment, when
+    creating for example a subscription.
+
+    :param attachment: The python value to encode.
+    :return: A b64 encoded object as a string.
+    """
+    return b64encode(json.dumps(attachment).encode()).decode()
+
+
+def decode_attachment(attachment):
+    """Helper function to decode an attachment from b64 to a Python object.
+
+    :param attachment: The b64 encoded value to decode as a string.
+    :return: A Python object of the decoded attachment.
+    """
+    return json.loads(b64decode(attachment).decode())
