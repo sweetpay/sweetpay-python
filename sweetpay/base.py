@@ -75,12 +75,10 @@ class BaseClient(object):
                  max_retries=None):
         """Initialize the checkout client used to talk to the checkout API.
 
-        :param api_token: The authorization token to set in the
-               Authorization header.
-        :param stage: A boolean indicating if the stage server should
-               be used or not. If set to False, the live server will be used.
-        :param version: The version number of the API, defaults to 1.
-        :param timeout: The request timeout. Defaults to 15 seconds.
+        :param api_token: Same as `SweetpayClient`.
+        :param stage: Same as `SweetpayClient`.
+        :param version: Same as `SweetpayClient`.
+        :param timeout: Same as `SweetpayClient`.
         :param headers: Optional. A dictionary of headers to update the
                         session headers with.
         :param max_retries: Optional. Set the amount of max retries of
@@ -235,31 +233,25 @@ class BaseResource(object):
     CLIENT_CLS = None
     namespace = None
 
-    api_token = None
-    stage = None
-    version = None
-    timeout = None
-
     # The validators.
     _validators = defaultdict(list)
 
-    @classmethod
-    def make_request(cls, cls_method, *args, **params):
+    def __init__(self, *client_args, **client_kwargs):
+        self.client = self.CLIENT_CLS(*client_args, **client_kwargs)
+
+    def make_request(self, cls_method, *args, **params):
         """Make a request through the specified client's method.
 
         If an exception isn't raised, the operation was successful.
 
         :param cls_method: The method on the client to use.
-        :param api_token: An optional API token the caller can
-                          specify to override the configured one.
         :param args: The args to pass on to the client method.
         :param params: The params to pass to the client method.
         :return: A `ResponseClass` instance.
         """
 
-        # TODO: Expand with stage and version?
-        # The client to make the request with, pass in the API token.
-        client = cls.get_client(params.pop("api_token", None))
+        # The client to make the request with.
+        client = self.client
 
         # Call the actual method. Note that this may raise an
         # AttributeError if the method doesn't exist, but we
@@ -273,11 +265,11 @@ class BaseResource(object):
         # to validate all fields.
         data = respcls.data
         if data:
-            cls.validate_data(data)
-        return cls.check_for_errors(respcls)
+            self.validate_data(data)
+        return self.check_for_errors(respcls)
 
     @classmethod
-    def check_for_errors(self, respcls):
+    def check_for_errors(cls, respcls):
         """Inspect a response for errors.
 
         This method must raise relevant exceptions or return some
@@ -369,33 +361,6 @@ class BaseResource(object):
             # Something else happened, just throw a general error.
             raise SweetpayError(
                 "Something went wrong in the request", **exc_kwargs)
-
-    @classmethod
-    def get_client(cls, api_token=None):
-        """Return an instantiated client, based on the `CLIENT_CLS`.
-
-        :param api_token: An optional api_token to override
-                          the configured one.
-        :return: An instantiated client.
-        """
-        if api_token is None:
-            api_token = cls.api_token
-        version = cls.version
-        stage = cls.stage
-        timeout = cls.timeout
-
-        # Check if api_token.
-        if api_token is None:
-            raise ValueError(
-                "You must set an API token and configure the extension "
-                "before using it. Have a look at `sweetpay.configure`")
-
-        # Get the version or nothing.
-        try:
-            version = version[cls.namespace]
-        except KeyError:
-            raise SweetpayError("Invalid version value, must be a mapping")
-        return cls.CLIENT_CLS(api_token, stage, version, timeout)
 
     @classmethod
     def validate_data(cls, data):

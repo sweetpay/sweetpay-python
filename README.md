@@ -17,8 +17,9 @@ pip install sweetpay
 
 ## Configuring the SDK
 ```python
-from sweetpay import configure
-configure("<your-api-token>", stage=True, version={"subscription": 1})
+from sweetpay import SweetpayClient
+client = SweetpayClient(
+    "<your-api-token>", stage=True, version={"subscription": 1})
 ```
 
 Note that all code examples below this point will assume that you've already configured the SDK as shown above.
@@ -29,7 +30,7 @@ Note that all code examples below this point will assume that you've already con
 from sweetpay import Subscription
 
 # Use an operation
-resp = Subscription.search(merchantId="<your-merchant-id>")
+resp = client.subscription.search(merchantId="<your-merchant-id>")
 
 # For getting the data returned from the server. Will be 
 # `None` if JSON wasn't provided. 
@@ -77,18 +78,10 @@ def validate_interval(value):
 
 For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
 
-## Dynamic configuration
-Sometimes you want to be able to set the configuration dynamically. For example configuring different timeouts for different operations. You can currently only configure the `timeout` on an operation basis, but support for more parameters can be built in if requested.
-
-```python
-from sweetpay import Subscription
-
-Subscription.search(country="SE", timeout=10)
-```
 
 ## Error handling
 
-If you're calling an operation on a resource (e.g. `Subscription.create`) and no exception is raised, you can rest assured that the operation succeeded. If something goes wrong, an exception will be raised.
+If you're calling an operation on a resource (e.g. `client.subscription.create`) and no exception is raised, you can rest assured that the operation succeeded. If something goes wrong, an exception will be raised.
 
 All exceptions exposes the `data`, `response`, `status`, `code` and `exc` attribute. None of them are guaranteed to have a value other than `None`, but they can be useful when you want to know the source of the error.
 
@@ -98,7 +91,7 @@ from sweetpay.errors import *
 
 try:
     # Use an operation
-    resp = Subscription.regret(subscription_id)
+    resp = client.subscription.regret(subscription_id)
 
 except FailureStatusError as e:
     # Whenever you get this, you would do best to inspect the 
@@ -111,13 +104,11 @@ except FailureStatusError as e:
 except UnauthorizedError as e:
     # You are simply unauthorized. Check your API token, 
     # or contact Sweetpay's developer to configure it correctly.
-    print("Wrong API token!")
+    print("Incorrect API token!")
     
 except NotFoundError as e:
     # The resource ID (e.g. `subscription_id`) did not match 
-    # an existing resource. Do some soul searching or why not 
-    # try to search (e.g. `Subscription.search`) for the 
-    # subscription you're looking for?
+    # an existing resource.
     print("The resource couldn't be found on the server")
 
 except ProxyError as e:
@@ -174,7 +165,7 @@ from sweetpay import Subscription
 from datetime import datetime
 from decimal import Decimal
 
-resp = Subscription.create(
+resp = client.subscription.create(
     amount=Decimal("200.0"), currency="SEK", 
     country="SE", merchantId="<your-merchant-id>",
     interval="MONTHLY", ssn="19500101-0001",
@@ -187,7 +178,7 @@ resp = Subscription.create(
 ```python
 from sweetpay import Subscription
 
-resp = Subscription.update(subscription_id, maxExecutions=4)
+resp = client.subscription.update(subscription_id, maxExecutions=4)
 ```
 
 ### Regret a subscription
@@ -195,7 +186,7 @@ resp = Subscription.update(subscription_id, maxExecutions=4)
 ```python
 from sweetpay import Subscription
 
-resp = Subscription.regret(subscription_id)
+resp = client.subscription.regret(subscription_id)
 ```
 
 ### Query a subscription
@@ -203,7 +194,7 @@ resp = Subscription.regret(subscription_id)
 ```python
 from sweetpay import Subscription
 
-resp = Subscription.query(subscription_id)
+resp = client.subscription.query(subscription_id)
 ```
 
 ### Search for subscriptions
@@ -211,12 +202,12 @@ resp = Subscription.query(subscription_id)
 ```python
 from sweetpay import Subscription
 
-resp = Subscription.search(country="SE")
+resp = client.subscription.search(country="SE")
 ```
 
 ### Listing the log for a subscription
 ```python
 from sweetpay import Subscription
 
-resp = Subscription.list_log(subscription_id)
+resp = client.subscription.list_log(subscription_id)
 ```

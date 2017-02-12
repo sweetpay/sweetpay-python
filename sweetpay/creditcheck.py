@@ -39,10 +39,8 @@ class Creditcheck(BaseResource):
     CLIENT_CLS = CreditcheckClient
     namespace = "creditcheck"
 
-    @classmethod
-    def create(cls, *args, **params):
-        return cls.make_request("make_check", *args, **params)
+    def create(self, *args, **params):
+        return self.make_request("make_check", *args, **params)
 
-    @classmethod
-    def search(cls, *args, **params):
-        return cls.make_request("search_checks", *args, **params)
+    def search(self, *args, **params):
+        return self.make_request("search_checks", *args, **params)

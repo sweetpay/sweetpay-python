@@ -56,35 +56,29 @@ class Subscription(BaseResource):
     CLIENT_CLS = SubscriptionClient
     namespace = "subscription"
 
-    @classmethod
-    def create(cls, *args, **params):
+    def create(self, *args, **params):
         """Create a subscription."""
-        return cls.make_request("create_subscription", *args, **params)
+        return self.make_request("create_subscription", *args, **params)
 
-    @classmethod
-    def query(cls, *args, **params):
+    def query(self, *args, **params):
         """Query a subscription for information."""
-        return cls.make_request("query_subscription", *args, **params)
+        return self.make_request("query_subscription", *args, **params)
 
-    @classmethod
-    def update(cls, *args, **params):
+    def update(self, *args, **params):
         """Update a subscription."""
-        return cls.make_request("update_subscription", *args, **params)
+        return self.make_request("update_subscription", *args, **params)
 
-    @classmethod
-    def search(cls, *args, **params):
+    def search(self, *args, **params):
         """Search for subscriptions."""
-        return cls.make_request("search_subscriptions", *args, **params)
+        return self.make_request("search_subscriptions", *args, **params)
 
-    @classmethod
-    def list_log(cls, *args, **params):
+    def list_log(self, *args, **params):
         """List all of the log entries."""
-        return cls.make_request("log_subscription", *args, **params)
+        return self.make_request("log_subscription", *args, **params)
 
-    @classmethod
-    def regret(cls, *args, **params):
+    def regret(self, *args, **params):
         """Regret a subscription."""
-        return cls.make_request("regret_subscription", *args, **params)
+        return self.make_request("regret_subscription", *args, **params)
 
 
 @Subscription.validates("payload", "startsAt")

@@ -34,7 +34,6 @@ class CheckoutSession(BaseResource):
     CLIENT_CLS = CheckoutClient
     namespace = "checkout"
 
-    @classmethod
-    def create(cls, *args, **params):
+    def create(self, *args, **params):
         """Create a checkout session"""
-        return cls.make_request("create_session", *args, **params)
+        return self.make_request("create_session", *args, **params)
