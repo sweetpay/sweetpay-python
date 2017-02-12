@@ -73,7 +73,7 @@ def validate_interval(value):
 For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
 
 ## Dynamic configuration
-Sometimes you want to be able to set the configuration dynamically. For example configuring different timeouts for different operations. You can currently only configure the `timeout` on an operation basis, but support for more parameters can be built in if requsted.
+Sometimes you want to be able to set the configuration dynamically. For example configuring different timeouts for different operations. You can currently only configure the `timeout` on an operation basis, but support for more parameters can be built in if requested.
 
 ```python
 from sweetpay import Subscription
