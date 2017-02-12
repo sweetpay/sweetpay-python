@@ -39,7 +39,9 @@ resp.code
 # example "OK" or "MISSING_COUNTRY".
 resp.status
 
-# For fetching the underlying `requests` response. Only use this 
+# For fetching the underlying `requests` response. If you don't 
+# know what to use this for, the odds are that you don't have a 
+# need for it.
 resp.response
 ```
 
@@ -90,7 +92,6 @@ All exceptions exposes the `data`, `response`, `status`, `code` and `exc` attrib
 ```python
 from sweetpay import Subscription
 from sweetpay.errors import *
-
 
 try:
     # Use an operation
