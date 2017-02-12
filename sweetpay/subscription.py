@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import json
+import uuid
+
 from .base import BaseResource, BaseClient
 from .utils import decode_datetime, decode_date
 
@@ -49,16 +50,6 @@ class SubscriptionClient(BaseClient):
         return self.make_request(url, "GET")
 
 
-def deserialize_callback_data(data, is_json_str=False):
-    """Deserialize callback data
-
-    :param data: The actual data to deserialize.
-    :param is_json_str: A boolean indicating if the the
-                        passed data is a JSON or a Python object.
-    """
-    return json.loads(data)
-
-
 class Subscription(BaseResource):
     """The subscription resource."""
 
@@ -78,7 +69,7 @@ class Subscription(BaseResource):
     @classmethod
     def update(cls, *args, **params):
         """Update a subscription."""
-        return cls.make_request("update", *args, **params)
+        return cls.make_request("update_subscription", *args, **params)
 
     @classmethod
     def search(cls, *args, **params):
@@ -113,7 +104,18 @@ def validate_payload_created_at(value):
 @Subscription.validates("payload")
 def validate_payload_when_list(value):
     if isinstance(value, list):
-        for sub in value:
-            sub["startsAt"] = decode_datetime(sub["startsAt"])
-            sub["createdAt"] = decode_datetime(sub["createdAt"])
+        for data in value:
+            # We make a check here as to not break anything if
+            # the API changes.
+            if "createdAt" in data:
+                data["createdAt"] = decode_datetime(data["createdAt"])
+
+            # Check whether we are listing log data or subscriptions
+            if "startsAt" in data:
+                # We are handling subscriptions
+                data["startsAt"] = decode_date(data["startsAt"])
+            elif "sessionId" in data:
+                # We are handling log data. We cannot get here if
+                # the data has a startsAt key.
+                data["sessionId"] = uuid.UUID(data["sessionId"])
     return value

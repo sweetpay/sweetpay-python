@@ -55,6 +55,10 @@ class FailureStatusError(SweetpayError):
     """
 
 
+class ProxyError(SweetpayError):
+    """When a proxy error occurs, i.e. we get a HTTP status code of 502."""
+
+
 class BadDataError(SweetpayError):
     """If bad data was passed to the server"""
 

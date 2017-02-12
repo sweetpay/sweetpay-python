@@ -13,12 +13,14 @@ from itertools import chain
 import requests
 from collections import defaultdict
 from requests import Session
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3 import Retry
 
 from .utils import setindict, getfromdict, decode_datetime
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError, MethodNotAllowedError, \
-    FailureStatusError
+    FailureStatusError, ProxyError
 from .constants import DATE_FORMAT, LOGGER_NAME, OK_STATUS
 
 __all__ = ["ResponseClass", "BaseClient", "BaseResource"]
@@ -55,6 +57,10 @@ class ResponseClass(object):
         self.data = data
         self.status = status
 
+    @property
+    def status_ok(self):
+        return self.status == OK_STATUS
+
     def __repr__(self):
         return (
             "<ResponseClass: code={0}, status={1}, "
@@ -66,7 +72,7 @@ class BaseClient(object):
     """The base class used to create API clients."""
 
     def __init__(self, api_token, stage, version, timeout, headers=None,
-                 session=None):
+                 max_retries=None):
         """Initialize the checkout client used to talk to the checkout API.
 
         :param api_token: The authorization token to set in the
@@ -77,8 +83,8 @@ class BaseClient(object):
         :param timeout: The request timeout. Defaults to 15 seconds.
         :param headers: Optional. A dictionary of headers to update the
                         session headers with.
-        :param session: Optional. An instantiated requests.Session class
-                        to use as the base session.
+        :param max_retries: Optional. Set the amount of max retries of
+                            requests to the API. Defaults to no retries.
         """
         self.api_token = api_token
         self.stage = stage
@@ -86,13 +92,18 @@ class BaseClient(object):
         self.timeout = timeout
         self.logger = logging.getLogger(LOGGER_NAME)
 
-        # The session
-        self.session = session or Session()
+        self.session = Session()
         self.session.headers.update({
             "Authorization": api_token, "Content-Type": "application/json",
             "Accept": "application/json", "User-Agent": "Python-SDK"
         })
         self.session.headers.update(headers or {})
+
+        # Configure max retries if passed
+        if max_retries:
+            retries = Retry(total=max_retries)
+            adapter = HTTPAdapter(max_retries=retries)
+            self.session.mount("https://", adapter)
 
     @property
     def stage_url(self):
@@ -154,7 +165,7 @@ class BaseClient(object):
                 reqdata = SweetpayJSONEncoder().encode(params)
             else:
                 # Use an empty body
-                reqdata = ""
+                reqdata = {}
             logger.info(
                 "Sending request with method=POST to url=%s and "
                 "parameters=%s", url, reqdata)
@@ -229,28 +240,21 @@ class BaseResource(object):
     version = None
     timeout = None
 
+    # The validators.
     _validators = defaultdict(list)
 
     @classmethod
     def make_request(cls, cls_method, *args, **params):
-        """Make request through the specified client's method.
+        """Make a request through the specified client's method.
 
-        :param cls_method: The method from the client to use.
+        If an exception isn't raised, the operation was successful.
+
+        :param cls_method: The method on the client to use.
         :param api_token: An optional API token the caller can
                           specify to override the configured one.
-        :param **params: The params to pass to the API endpoint.
-
-        :raise BadDataError: If the HTTP status code is 400
-        :raise InvalidParameterError: If the HTTP status code is 422
-        :raise InternalServerError: If an internal server error occurred
-                                    at Sweetpay.
-        :raise UnauthorizedError: If the API token was invalid.
-        :raise NotFoundError: If the requested resource couldn't be found.
-        :raise UnderMaintenanceError: If the server is currently
-                                      under maintenance.
-        :raise TimeoutError: If a request timeout occurred.
-        :raise RequestError: If an unhandled request error occurred.
-        :return: A request object.
+        :param args: The args to pass on to the client method.
+        :param params: The params to pass to the client method.
+        :return: A `ResponseClass` instance.
         """
 
         # TODO: Expand with stage and version?
@@ -258,23 +262,49 @@ class BaseResource(object):
         client = cls.get_client(params.pop("api_token", None))
 
         # Call the actual method. Note that this may raise an
-        # AttributeErorr if the method doesn't exist, but we
+        # AttributeError if the method doesn't exist, but we
         # let that bubble up. It may also raise a RequestError,
         # but as that is a subclass of SweetpayError we let that
         # bubble up as well.
         method_callable = getattr(client, cls_method)
-        retval = method_callable(*args, **params)
+        respcls = method_callable(*args, **params)
 
-        # If existent, we assume data is a dict, and try
+        # If data is existent, we assume data is a dict, and try
         # to validate all fields.
-        data = retval.data
+        data = respcls.data
         if data:
             cls.validate_data(data)
+        return cls.check_for_errors(respcls)
 
+    @classmethod
+    def check_for_errors(self, respcls):
+        """Inspect a response for errors.
+
+        This method must raise relevant exceptions or return some
+        sort of data to the user. The default implementation is
+        to raise exceptions based on the code/status, or return
+        the ResponseClass if all is well.
+
+        :param respcls: An instance of a ResponseClass.
+        :raise BadDataError: If the HTTP status code is 400.
+        :raise InvalidParameterError: If the HTTP status code is 422.
+        :raise InternalServerError: If an internal server error occurred
+                                    at Sweetpay.
+        :raise UnauthorizedError: If the API token was invalid.
+        :raise NotFoundError: If the requested resource couldn't be found.
+        :raise UnderMaintenanceError: If the server is currently
+                                      under maintenance.
+        :raise FailureStatusError: If the status isn't OK.
+        :raise ProxyError: If a proxy error occurred.
+        :raise TimeoutError: If a request timeout occurred.
+        :raise RequestError: If an unhandled request error occurred.
+        :return: A `ResponseClass` instance.
+        """
         # Set some shortcuts
-        code = retval.code
-        resp = retval.response
-        status = retval.status
+        code = respcls.code
+        resp = respcls.response
+        status = respcls.status
+        data = respcls.data
 
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {
@@ -284,14 +314,20 @@ class BaseResource(object):
 
         # Check if the response was successful.
         if code == 200:
-            if retval.status == OK_STATUS:
-                # If all OK, return the response class.
-                return retval
+            if respcls.status_ok:
+                # If all OK, return the response.
+                return respcls
             else:
                 raise FailureStatusError(
                     "The passed status={0} is not the OK_STATUS={1}, "
                     "meaning that the requested operation did not "
-                    "succeed".format(retval.status, OK_STATUS), **exc_kwargs)
+                    "succeed".format(status, OK_STATUS), **exc_kwargs)
+
+        # TODO: Is this really how we should do it?
+        # Hacky workaround set the status from the error.
+        if status is None and hasattr(data, "get"):
+            status = data.get("error", None)
+            exc_kwargs["status"] = status
 
         # Start checking for errors
         if code == 400:
@@ -320,6 +356,11 @@ class BaseResource(object):
         elif code == 500:
             raise InternalServerError(
                 "An internal server occurred", **exc_kwargs)
+        elif code == 502:
+            raise ProxyError(
+                "A proxy error occurred. Note that if you tried to create "
+                "a new resource, it is possible that it was created, "
+                "even though this error occurred.", **exc_kwargs)
         elif code == 503:
             raise UnderMaintenanceError(
                 "The server is currently under maintenance and can't "
@@ -366,6 +407,7 @@ class BaseResource(object):
         # Iterate through both the current iterators, and the
         # base resources iterator. Note that we assume that
         # the BaseResource is always subclassed here.
+        # We can ignore keyerrors as _validators is a defaultdict(list).
         validators = chain(cls._validators[cls], cls._validators[BaseResource])
         for validator in validators:
             path = validator._dictpath
@@ -397,6 +439,10 @@ class BaseResource(object):
                 return func(*args, **kwargs)
             return inner
         return outer
+
+    def __repr__(self):
+        return "<{0}: namespace={1}, version={2}>".format(
+            type(self).__name__, self.namespace, self.version)
 
 
 @BaseResource.validates("createdAt")

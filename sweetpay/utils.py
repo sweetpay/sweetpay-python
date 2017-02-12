@@ -16,20 +16,30 @@ from .constants import DATE_FORMAT
 def decode_datetime(value, to_utc=True):
     """Decode a datetime string.
 
+    :param value: The string to convert into a datetime.
     :param to_utc: Whether to convert the timezone to UTC or not.
+    :raise ValueError: If the passed value is invalid, for
+                       example if it is empty.
+    :return: A `datetime.datetime` object.
     """
     if not value:
         raise ValueError("value parameter cannot be empty")
 
     dt = dateutil.parser.parse(value)
     if to_utc:
+        # NOTE: This wil fail when the datetime is naive or
+        # a date is the value.
         utc = tz.gettz("UTC")
         dt = dt.astimezone(utc)
     return dt
 
 
 def decode_date(value):
-    """Decode a date string."""
+    """Decode a date string.
+
+    :param value: The string to convert into a date.
+    :return: A `datetime.date` object.
+    """
     # We cannot convert the datetime to utc, as the
     # starts_at is based on a Swedish datetime
     return datetime.strptime(value, DATE_FORMAT).date()
