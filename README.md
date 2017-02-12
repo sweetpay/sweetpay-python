@@ -1,10 +1,13 @@
-# Sweetpay SDK #
+# Sweetpay SDK
 
 This is a Python SDK for SweetPay's different APIs. Note that this library is not production ready yet. The checkout (v1), creditcheck (v2) and subscription (v1) API is currently only supported.
 
 The documentation of the underlying APIs can be found [here](https://developers.sweetpayments.com/docs/).
 
 Some tests have been written for the subscription API, which makes it the currently most stable part of the SDK. 
+
+## API documentations
+1. [Subscription API](#subscription-api)
 
 ## Installation
 You can use `pip` to install the SDK.
@@ -172,10 +175,10 @@ from datetime import datetime
 from decimal import Decimal
 
 resp = Subscription.create(
-        amount=Decimal("200.0"), currency="SEK", 
-        country="SE", merchantId="<your-merchant-id>",
-        interval="MONTHLY", ssn="19500101-0001",
-        startsAt=datetime.utcnow().date())
+    amount=Decimal("200.0"), currency="SEK", 
+    country="SE", merchantId="<your-merchant-id>",
+    interval="MONTHLY", ssn="19500101-0001",
+    startsAt=datetime.utcnow().date())
 ```
 
 ### Update a subscription
