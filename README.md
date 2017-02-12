@@ -57,9 +57,20 @@ from sweetpay.utils import decode_datetime
 def validate_starts_at(value):
     return decode_datetime(value)
     
+# This can also be useful when you want to transform a 
+# value from Sweetpay to, for example, your own `enum.Enum` object.
+# However, this should be used with care, as you cannot guarantee
+# that Sweetpay doesn't add values, which you haven't stored in  
+# your enum.
+@Subscription.validates("payload", "interval")
+def validate_interval(value):
+    return MyIntervalEnum(value)
+
 # Use `sweetpay.BaseResource.validates` if you want to set a 
 # validator for all APIs.
 ```
+
+For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
 
 ## Dynamic configuration
 Sometimes you want to be able to set the configuration dynamically. For example configuring different timeouts for different operations. You can currently only configure the `timeout` on an operation basis, but support for more parameters can be built in if requsted.
@@ -74,7 +85,7 @@ Subscription.search(country="SE", timeout=10)
 
 If you're calling an operation on a resource (e.g. `Subscription.create`) and no exception is raised, you can rest assured that the operation succeeded. If something goes wrong, an exception will be raised.
 
-All exceptions exposes the `data`, `response`, `status`, `code` and `exc` attribute. None of them are guaranteed to have a value other than None, but they can be useful when you want to know the source of the error.
+All exceptions exposes the `data`, `response`, `status`, `code` and `exc` attribute. None of them are guaranteed to have a value other than `None`, but they can be useful when you want to know the source of the error.
 
 ```python
 from sweetpay import Subscription
@@ -86,11 +97,12 @@ try:
     resp = Subscription.regret(subscription_id)
 
 except FailureStatusError as e:
-    # Whenever you get this, you would do best to inspect the status 
+    # Whenever you get this, you would do best to inspect the 
+    # status, to figure out what went wrong. 
     if e.status == "NOT_MODIFIABLE":
         print("Oh, the subscription can't be modified")
     else:
-        print("Oh, we're screwed")
+        print("Oh, something else happened")
         
 except UnauthorizedError as e:
     # You are simply unauthorized. Check your API token, 
@@ -145,24 +157,27 @@ except SweetpayError as e:
     print("You can catch all errors with this one")
 ```
 
-# Subscriptions
+## Subscription API
 
 This part explains how to interact with the subscription API.
 
-## Create a subscriptions
+### Create a subscriptions
 
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#create-a-subscription)
 
 ```python
 from sweetpay import Subscription
+from datetime import datetime
+from decimal import Decimal
 
 resp = Subscription.create(
-        amount=10, currency="SEK", country="SE", 
-        merchantId="<your-merchant-id>",
-        interval="MONTHLY", ssn="19500101-0001")
+        amount=Decimal("200.0"), currency="SEK", 
+        country="SE", merchantId="<your-merchant-id>",
+        interval="MONTHLY", ssn="19500101-0001",
+        startsAt=datetime.utcnow().date())
 ```
 
-## Update a subscription
+### Update a subscription
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#update-a-subscription)
 
 ```python
@@ -171,7 +186,7 @@ from sweetpay import Subscription
 resp = Subscription.update(subscription_id, maxExecutions=4)
 ```
 
-## Regret a subscription
+### Regret a subscription
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#regret-a-subscription)
 ```python
 from sweetpay import Subscription
@@ -179,7 +194,7 @@ from sweetpay import Subscription
 resp = Subscription.regret(subscription_id)
 ```
 
-## Query a subscription
+### Query a subscription
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#query-a-subscription)
 ```python
 from sweetpay import Subscription
@@ -187,7 +202,7 @@ from sweetpay import Subscription
 resp = Subscription.query(subscription_id)
 ```
 
-## Search for subscriptions
+### Search for subscriptions
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#search-for-subscriptions)
 ```python
 from sweetpay import Subscription
@@ -195,7 +210,7 @@ from sweetpay import Subscription
 resp = Subscription.search(country="SE")
 ```
 
-## Listing the log for a subscription
+### Listing the log for a subscription
 ```python
 from sweetpay import Subscription
 
