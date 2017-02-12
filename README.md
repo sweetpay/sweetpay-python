@@ -12,27 +12,34 @@ You can use `pip` to install the SDK.
 pip install sweetpay
 ```
 
-## Configuring the extension
+## Configuring the SDK
 ```python
 from sweetpay import configure
 configure("<your-api-token>", stage=True, version={"subscription": 1})
 ```
 
+Note that all code examples will assume that you've already configured the SDK as shown above.
+
 ## General use
 
 ```python
 from sweetpay import Subscription
-resp = Subscription.search(merchantId="<your-merchant-id>")
 
+# Use an operation
+resp = Subscription.search(merchantId="<your-merchant-id>")
 
 # For getting the data returned from the server. Will be 
 # `None` if JSON wasn't provided. 
 resp.data
+
 # For fetching the HTTP status code.
 resp.code
-# For getting the status passed from the server
+
+# For getting the status passed from the server. For 
+# example "OK" or "MISSING_COUNTRY".
 resp.status
-# For fetching the underlying `requests` response
+
+# For fetching the underlying `requests` response. Only use this 
 resp.response
 ```
 
@@ -75,12 +82,13 @@ from sweetpay.errors import *
 
 
 try:
+    # Use an operation
     resp = Subscription.regret(subscription_id)
 
 except FailureStatusError as e:
     # Whenever you get this, you would do best to inspect the status 
     if e.status == "NOT_MODIFIABLE":
-        print("Doing stuff")
+        print("Oh, the subscription can't be modified")
     else:
         print("Oh, we're screwed")
         
