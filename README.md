@@ -179,7 +179,7 @@ from sweetpay import Subscription
 resp = Subscription.regret(subscription_id)
 ```
 
-## Querying a subscription
+## Query a subscription
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#query-a-subscription)
 ```python
 from sweetpay import Subscription
@@ -187,7 +187,7 @@ from sweetpay import Subscription
 resp = Subscription.query(subscription_id)
 ```
 
-## Searching for subscriptions
+## Search for subscriptions
 [Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#search-for-subscriptions)
 ```python
 from sweetpay import Subscription
