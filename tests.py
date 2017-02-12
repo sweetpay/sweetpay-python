@@ -33,9 +33,8 @@ from datetime import date, datetime, timedelta
 
 import pytest
 from sweetpay import Subscription, CheckoutSession, Creditcheck, configure
-from sweetpay.constants import OK_STATUS
-from sweetpay.errors import FailureStatusError, BadDataError, NotFoundError, \
-    InvalidParameterError
+from sweetpay.constants import OK_STATUS, TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
+from sweetpay.errors import FailureStatusError, BadDataError, NotFoundError
 from uuid import uuid4
 
 # TODO: Create specific merchant and token for testing
@@ -43,10 +42,6 @@ from uuid import uuid4
 # when we have support for several versions of the APIs. At least
 # not when testing.
 configure("paylevo", True, {"subscription": 1, "creditcheck": 2}, timeout=4)
-
-# Just some test data
-CREDIT_SSN = "19500101-0001"
-NOCREDIT_SSN = "19500101-0007"
 
 # The startsAt to use for subscription. It is important that 
 # this isn't today's date, as that is what the subscription 
@@ -68,20 +63,22 @@ def assert_isdate(val):
 
 
 def create_subscription(credit=True, **extra):
+    ssn = TEST_CREDIT_SSN if credit else TEST_NOCREDIT_SSN
     return Subscription.create(
-        amount=200, currency="SEK", country="SE",  merchantId="paylevo",
-        interval="MONTHLY", ssn=CREDIT_SSN if credit else NOCREDIT_SSN,
-        startsAt=STARTS_AT, maxExecutions=4, **extra)  # This row not mandatory
+        amount=10, currency="SEK", country="SE",  merchantId="sweetpay-demo",
+        interval="MONTHLY", ssn=ssn, startsAt=STARTS_AT, maxExecutions=4,
+        **extra)
 
 
 def assert_subscription(payload, credit=True):
     assert payload["customer"]["address"]["country"] == "SE"
     assert payload["startsAt"] == STARTS_AT
-    assert payload["amount"] == 200
+    assert payload["amount"] == 10
     assert payload["currency"] == "SEK"
     assert payload["interval"] == "MONTHLY"
-    assert payload["merchantId"] == "paylevo"
-    assert payload["customer"]["ssn"] == CREDIT_SSN if credit else NOCREDIT_SSN
+    assert payload["merchantId"] == "sweetpay-demo"
+    assert payload["customer"]["ssn"] == TEST_CREDIT_SSN if credit else \
+        TEST_NOCREDIT_SSN
     assert payload["maxExecutions"] == 4
 
 
@@ -92,7 +89,6 @@ class TestSubscriptionResource:
         data = resp.data
         payload = data["payload"]
 
-        assert payload
         assert_isdatetime(data["createdAt"])
         assert_isdate(payload["startsAt"])
         assert_subscription(payload)
@@ -102,7 +98,7 @@ class TestSubscriptionResource:
             create_subscription(credit=False)
         exc = excinfo.value
         assert exc.data
-        assert "payload" not in exc.data  # Expecting empty payload
+        assert "payload" not in exc.data  # Expecting no payload
         assert exc.status == "CUSTOMER_NOT_CREDIBLE"
 
     # TODO: Test with mock instead.
@@ -111,7 +107,7 @@ class TestSubscriptionResource:
     def test_create_with_missing_amount(self):
         with pytest.raises(BadDataError) as excinfo:
             Subscription.create(
-                currency="SEK", interval="MONTHLY", ssn=CREDIT_SSN,
+                currency="SEK", interval="MONTHLY", ssn=TEST_CREDIT_SSN,
                 merchantId="paylevo", country="SE")
         exc = excinfo.value
         assert exc.status == "Missing amount."
