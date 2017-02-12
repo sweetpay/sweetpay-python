@@ -18,7 +18,7 @@ from sweetpay import configure
 configure("<your-api-token>", stage=True, version={"subscription": 1})
 ```
 
-Note that all code examples will assume that you've already configured the SDK as shown above.
+Note that all code examples below this point will assume that you've already configured the SDK as shown above.
 
 ## General use
 
@@ -52,7 +52,7 @@ from sweetpay.utils import decode_datetime
 
 # Note how we specify the path to the attribute. If the 
 # path to the attribute simply can't be found, the 
-# validator will simply be ignored.
+# validator will be ignored.
 @Subscription.validates("payload", "startsAt")
 def validate_starts_at(value):
     return decode_datetime(value)
