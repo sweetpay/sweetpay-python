@@ -162,10 +162,10 @@ def test_subscription_creation(client):
     with client.subscription.mock_resource(
             data={"status": "OK"}, code=200, response=None, status="OK"):
         resp = client.subscription.create(amount=200)
-        assert resp.data == {"status": "OK"}
-        assert resp.code == 200
-        assert resp.status == "OK"
-        assert resp.response is None
+    assert resp.data == {"status": "OK"}
+    assert resp.code == 200
+    assert resp.status == "OK"
+    assert resp.response is None
 
 # If we instead want to test an exception
 def test_subscription_creation_failure(client):

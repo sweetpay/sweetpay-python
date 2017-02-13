@@ -39,10 +39,10 @@ class TestMocking:
         with client.subscription.mock_resource(
                 data={"status": "OK"}, code=200, status="OK", response=123):
             assert client.subscription.is_mocked is True
-            resp = client.subscription.regret(242)
-            self.assert_resp(resp)
-            resp = client.subscription.create(amount=303)
-            self.assert_resp(resp)
+            resp_1 = client.subscription.regret(242)
+            resp_2 = client.subscription.create(amount=303)
+        self.assert_resp(resp_1)
+        self.assert_resp(resp_2)
 
         assert client.subscription.is_mocked is False
         self.assert_removed_mock(client, monkeypatch)
