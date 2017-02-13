@@ -2,7 +2,9 @@
 
 
 class SweetpayError(Exception):
-    """The base Sweetpay exception."""
+    """The base Sweetpay exception. Raised for ambiguous scenarios,
+    when no other exception type fits.
+    """
 
     # The JSON decoded data from the server. None if the JSON
     # couldn't be decoded.
