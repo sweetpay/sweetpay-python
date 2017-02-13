@@ -237,10 +237,11 @@ class BaseResource(object):
     # The validators.
     _validators = defaultdict(list)
 
-    def __init__(self, *client_args, **client_kwargs):
+    def __init__(self, use_validators, *client_args, **client_kwargs):
         self.client = self.CLIENT_CLS(*client_args, **client_kwargs)
         self.mockdata = None
         self.mockexc = None
+        self.use_validators = use_validators
 
     def make_request(self, cls_method, *args, **params):
         """Make a request through the specified client's method.
@@ -271,9 +272,13 @@ class BaseResource(object):
         # If data is existent, we assume data is a dict, and try
         # to validate all fields.
         data = respcls.data
-        if data:
-            self.validate_data(data)
+        if data and self.use_validators:
+            data = self.validate_data(data)
         return self.check_for_errors(respcls)
+
+    @classmethod
+    def clear_validators(cls):
+        cls._validators = defaultdict(list)
 
     @classmethod
     def check_for_errors(cls, respcls):
@@ -393,7 +398,13 @@ class BaseResource(object):
             else:
                 # Validate the field and set the new value
                 validated = validator(value)
-                setindict(data, path, validated)
+                # If path is empty, we will just set a new
+                # data variable.
+                if not path:
+                    data = validated
+                else:
+                    setindict(data, path, validated)
+        return data
 
     @classmethod
     def validates(cls, *args):
@@ -418,12 +429,15 @@ class BaseResource(object):
         return self.mockexc is not None or self.mockdata is not None
 
     @contextmanager
-    def mock_resource(self, raises=None, **respcls_kw):
+    def mock_resource(self, raises=None, code=None, data=None, response=None,
+                      status=None):
         """Mock all of the resource's operations.
 
         This is meant to be used for testing."""
         self.mockexc = raises
-        self.mockdata = respcls_kw
+        self.mockdata = {
+            "code": code, "data": data, "response": response, "status": status
+        }
         yield
         self.mockdata = None
         self.mockexc = None

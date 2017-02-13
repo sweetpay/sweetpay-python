@@ -46,36 +46,30 @@ resp.response
 ```
 
 ## Validation and deserialization
-NOTE: The way `.validates` work is destined to change in the near future.
-
 
 In order to deserialize the response from the server, the SDK exposes a `validates` decorator, which can be used to turn. The SDK already has a couple of validators configured, mainly to convert strings to datetime and date objects.
  
 ```python
-from sweetpay import Subscription
-from sweetpay.utils import decode_datetime
+from sweetpay import validates
+from sweetpay.utils import decode_datetime, decode_date
 
-# Note how we specify the path to the attribute. If the 
-# path to the attribute simply can't be found, the 
-# validator will be ignored.
-@Subscription.validates("payload", "startsAt")
+# The first argument is the resource as in `client.resource`, and 
+# the second argument is the path to the resource. If the path 
+# can't be found, the validator will just be skipped.
+@validates("subscription", ["payload", "startsAt"])
 def validate_starts_at(value):
-    return decode_datetime(value)
-    
-# This can also be useful when you want to transform a 
-# value from Sweetpay to, for example, your own `enum.Enum` object.
-# However, this should be used with care, as you cannot guarantee
-# that Sweetpay doesn't add values, which you haven't stored in  
-# your enum.
-@Subscription.validates("payload", "interval")
-def validate_interval(value):
-    return MyIntervalEnum(value)
+    return decode_date(value)
 
-# Use `sweetpay.BaseResource.validates` if you want to set a 
-# validator for all APIs.
+# Just specify a path if you want to set the validator for all
+# resources.
+@validates(["createdAt"])
+def validate_created_at(value):
+    return decode_datetime(value)
 ```
 
 For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
+
+If you don't want any validation at all, you can remove it by setting `use_validators` to `False` when creating the `SweetpayClient`.
 
 
 ## Error handling
