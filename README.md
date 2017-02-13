@@ -47,7 +47,7 @@ resp.response
 
 ## Validation and deserialization
 
-In order to deserialize the response from the server, the SDK exposes a `validates` decorator, which can be used to turn. The SDK already has a couple of validators configured, mainly to convert strings to datetime and date objects.
+In order to deserialize the response from the server, the SDK exposes a `validates` decorator, which can be used to validate JSON returned from the server. The SDK comes packaged with some validators configured, mainly to convert strings to datetime and date objects.
  
 ```python
 from sweetpay import validates
