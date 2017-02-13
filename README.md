@@ -25,8 +25,6 @@ Note that all code examples below this point will assume that you've already con
 ## General use
 
 ```python
-from sweetpay import Subscription
-
 # Use an operation
 resp = client.subscription.search(merchantId="<your-merchant-id>")
 
@@ -48,6 +46,9 @@ resp.response
 ```
 
 ## Validation and deserialization
+NOTE: The way `.validates` work is destined to change in the near future.
+
+
 In order to deserialize the response from the server, the SDK exposes a `validates` decorator, which can be used to turn. The SDK already has a couple of validators configured, mainly to convert strings to datetime and date objects.
  
 ```python
@@ -79,17 +80,16 @@ For more advanced validation and deserialization, you can use something like [ma
 
 ## Error handling
 
-If you're calling an operation on a resource (e.g. `client.subscription.create`) and no exception is raised, you can rest assured that the operation succeeded. If something goes wrong, an exception will be raised.
+If you're calling an operation on a resource (e.g. `client.subscription.create`) and no exception is raised, you can rest assured that the operation succeeded. If something goes wrong, an exception will always be raised.
 
 All exceptions exposes the `data`, `response`, `status`, `code` and `exc` attribute. None of them are guaranteed to have a value other than `None`, but they can be useful when you want to know the source of the error.
 
 ```python
-from sweetpay import Subscription
 from sweetpay.errors import *
 
 try:
     # Use an operation
-    resp = client.subscription.regret(subscription_id)
+    resp = client.subscription.create(amount=200)
 
 except FailureStatusError as e:
     # Whenever you get this, you would do best to inspect the 
@@ -195,10 +195,9 @@ This part explains how to interact with the subscription API.
 
 ### Create a subscriptions
 
-[Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#create-a-subscription)
+Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#create-a-subscription) for the API documentation and the available parameters.
 
 ```python
-from sweetpay import Subscription
 from datetime import datetime
 from decimal import Decimal
 
@@ -210,41 +209,31 @@ resp = client.subscription.create(
 ```
 
 ### Update a subscription
-[Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#update-a-subscription)
+Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#update-a-subscription) for the API documentation and the available parameters.
 
 ```python
-from sweetpay import Subscription
-
 resp = client.subscription.update(subscription_id, maxExecutions=4)
 ```
 
 ### Regret a subscription
-[Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#regret-a-subscription)
+Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#regret-a-subscription) for the API documentation and the available parameters.
 ```python
-from sweetpay import Subscription
-
 resp = client.subscription.regret(subscription_id)
 ```
 
 ### Query a subscription
-[Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#query-a-subscription)
+Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#query-a-subscription) for the API documentation and the available parameters.
 ```python
-from sweetpay import Subscription
-
 resp = client.subscription.query(subscription_id)
 ```
 
 ### Search for subscriptions
-[Follow this link for the API documentation and the available parameters](https://developers.sweetpayments.com/docs/subscription/apiref/#search-for-subscriptions)
+Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#search-for-subscriptions) for the API documentation and the available parameters.
 ```python
-from sweetpay import Subscription
-
 resp = client.subscription.search(country="SE")
 ```
 
 ### Listing the log for a subscription
 ```python
-from sweetpay import Subscription
-
 resp = client.subscription.list_log(subscription_id)
 ```
