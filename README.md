@@ -1,6 +1,4 @@
-# Sweetpay SDK
-
-This is a Python SDK for SweetPay's different APIs. Note that this library is not production ready yet. The checkout (v1), creditcheck (v2) and subscription (v1) API is currently only supported.
+This is a Python SDK for Sweetpay's different APIs. Note that this library is not production ready yet. The checkout (v1), creditcheck (v2) and subscription (v1) API is currently only supported.
 
 The documentation of the underlying APIs can be found [here](https://developers.sweetpayments.com/docs/).
 
@@ -151,6 +149,45 @@ except SweetpayError as e:
     # The parent of all errors. 
     print("You can catch all errors with this one")
 ```
+
+## Testing
+If you want to test your code without sending requests to server, you can easily do so by making use the `mock_resource`. This will simply prevent you from sending any requests from the server, while still validating the mocked data, with the validators registered with the `.validates` decorators.
+```python
+import pytest
+from sweetpay.errors import InvalidParameterError
+from sweetpay.base import ResponseClass
+
+# Testing the successful creation of a subscription
+def test_subscription_creation(client):
+    with client.subscription.mock_resource(
+            data={"status": "OK"}, code=200, response=None, status="OK"):
+        resp = client.subscription.create(amount=200)
+        assert resp.data == {"status": "OK"}
+        assert resp.code == 200
+        assert resp.status == "OK"
+        assert resp.response is None
+
+# If we instead want to test an exception
+def test_subscription_creation_failure(client):
+    exc = InvalidParameterError()
+    with client.subscription.mock_resource(raises=exc):
+        with pytest.raises(InvalidParameterError) as excinfo:
+            client.subscription.create(amount=200)
+    assert excinfo.value is exc
+   
+# Or simply use your own mocking/patching/monkeypatching. 
+# However, the drawback of this method is that you need to 
+# know something about the internals of the sweetpay library,
+# which may come to change.
+def test_something_with_mock(client, monkeypatch):
+    retval = ResponseClass(
+        data={"status": "OK"}, code=200, status="OK", response=None)
+    monkeypatch.setattr(client.subscription, "create", lambda **kw: retval)
+    resp = client.subscription.create(amount=200)
+    assert resp is retval
+```
+
+Note that the operations can only be mocked on a resource basis. This means that if you mock `client.subscription` then `client.creditcheck` won't automatically be mocked.
 
 ## Subscription API
 

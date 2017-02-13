@@ -418,7 +418,7 @@ class BaseResource(object):
         return self.mockexc is not None or self.mockdata is not None
 
     @contextmanager
-    def mock_all_operations(self, raises=None, **respcls_kw):
+    def mock_resource(self, raises=None, **respcls_kw):
         """Mock all of the resource's operations.
 
         This is meant to be used for testing."""

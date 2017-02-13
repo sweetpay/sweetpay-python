@@ -36,7 +36,7 @@ class TestMocking:
 
     def test_all_operations_with_return_value(self, client, monkeypatch):
         assert client.subscription.is_mocked is False
-        with client.subscription.mock_all_operations(
+        with client.subscription.mock_resource(
                 data={"status": "OK"}, code=200, status="OK", response=123):
             assert client.subscription.is_mocked is True
             resp = client.subscription.regret(242)
@@ -51,7 +51,7 @@ class TestMocking:
         exc = NotFoundError()
         assert client.subscription.is_mocked is False
 
-        with client.subscription.mock_all_operations(raises=exc), \
+        with client.subscription.mock_resource(raises=exc), \
                 pytest.raises(NotFoundError) as excinfo:
             assert client.subscription.is_mocked is True
             client.subscription.regret(242)
@@ -60,3 +60,11 @@ class TestMocking:
         assert client.subscription.is_mocked is False
         assert excinfo.value is exc
         self.assert_removed_mock(client, monkeypatch)
+
+
+def test_something_with_mock(client, monkeypatch):
+    retval = ResponseClass(
+        data={"status": "OK"}, code=200, status="OK", response=None)
+    monkeypatch.setattr(client.subscription, "create", lambda **kw: retval)
+    resp = client.subscription.create(amount=200)
+    assert resp is retval
