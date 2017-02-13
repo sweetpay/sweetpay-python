@@ -32,8 +32,7 @@ Radio and, at times, Kyla La Grange - Cut Your Teeth on repeat.
 from datetime import date, datetime, timedelta
 
 import pytest
-from sweetpay import SweetpayClient
-from sweetpay.constants import OK_STATUS, TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
+from sweetpay.constants import TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
 from sweetpay.errors import FailureStatusError, BadDataError, NotFoundError
 from uuid import uuid4
 
@@ -41,14 +40,6 @@ from uuid import uuid4
 # this isn't today's date, as that is what the subscription 
 # API defaults to.
 STARTS_AT = (datetime.utcnow() - timedelta(days=10)).date()
-
-
-@pytest.fixture()
-def client():
-    # TODO: Create merchant and token for testing
-    return SweetpayClient(
-        "paylevo", True, {"subscription": 1, "creditcheck": 2, "checkout": 1},
-        timeout=4)
 
 
 def assert_isdatetime(val):

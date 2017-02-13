@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from contextlib import contextmanager
 
 from .constants import LOGGER_NAME
 from .checkout import CheckoutSession

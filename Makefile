@@ -1,5 +1,5 @@
 test:
-	pytest tests.py
+	pytest tests/
 
 setupdev:
 	pip install -r requirements.txt.dev

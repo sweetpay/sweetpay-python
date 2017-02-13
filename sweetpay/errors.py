@@ -27,7 +27,7 @@ class SweetpayError(Exception):
     # of request error occurred (e.g. a timeout).
     exc = None
 
-    def __init__(self, msg, data=None, response=None, code=None,
+    def __init__(self, msg=None, data=None, response=None, code=None,
                  status=None, exc=None):
         super(SweetpayError, self).__init__(self, msg)
         self.data = data

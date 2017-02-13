@@ -7,6 +7,7 @@ import logging
 import os
 import json
 import datetime
+from contextlib import contextmanager
 from decimal import Decimal
 from itertools import chain
 
@@ -238,6 +239,8 @@ class BaseResource(object):
 
     def __init__(self, *client_args, **client_kwargs):
         self.client = self.CLIENT_CLS(*client_args, **client_kwargs)
+        self.mockdata = None
+        self.mockexc = None
 
     def make_request(self, cls_method, *args, **params):
         """Make a request through the specified client's method.
@@ -250,16 +253,20 @@ class BaseResource(object):
         :return: A `ResponseClass` instance.
         """
 
-        # The client to make the request with.
-        client = self.client
-
-        # Call the actual method. Note that this may raise an
-        # AttributeError if the method doesn't exist, but we
-        # let that bubble up. It may also raise a RequestError,
-        # but as that is a subclass of SweetpayError we let that
-        # bubble up as well.
-        method_callable = getattr(client, cls_method)
-        respcls = method_callable(*args, **params)
+        # Check if we are in mocking mode or not.
+        if self.is_mocked:
+            if self.mockexc:
+                raise self.mockexc
+            else:
+                respcls = ResponseClass(**self.mockdata)
+        else:
+            # Call the actual method. Note that this may raise an
+            # AttributeError if the method doesn't exist, but we
+            # let that bubble up. It may also raise a RequestError,
+            # but as that is a subclass of SweetpayError we let that
+            # bubble up as well.
+            method_callable = getattr(self.client, cls_method)
+            respcls = method_callable(*args, **params)
 
         # If data is existent, we assume data is a dict, and try
         # to validate all fields.
@@ -405,9 +412,25 @@ class BaseResource(object):
             return inner
         return outer
 
+    @property
+    def is_mocked(self):
+        """Return a value to indicate whether the resource is mocked or not."""
+        return self.mockexc is not None or self.mockdata is not None
+
+    @contextmanager
+    def mock_all_operations(self, raises=None, **respcls_kw):
+        """Mock all of the resource's operations.
+
+        This is meant to be used for testing."""
+        self.mockexc = raises
+        self.mockdata = respcls_kw
+        yield
+        self.mockdata = None
+        self.mockexc = None
+
     def __repr__(self):
-        return "<{0}: namespace={1}, version={2}>".format(
-            type(self).__name__, self.namespace, self.version)
+        return "<{0}: namespace={1}>".format(
+            type(self).__name__, self.namespace)
 
 
 @BaseResource.validates("createdAt")
@@ -415,3 +438,12 @@ def validate_created_at(value):
     if value:
         return decode_datetime(value)
     return value
+
+
+def _operation(func):
+    """Mark a method or function as an operation."""
+    # TODO: Set mock function
+    # TODO: Set validator?
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+    raise NotImplementedError
