@@ -3,6 +3,7 @@ import logging
 import uuid
 from functools import wraps
 
+from . import errors
 from .constants import LOGGER_NAME, SUBSCRIPTION, CREDITCHECK, CHECKOUT_SESSION
 from .checkout import CheckoutSessionV1
 from .subscription import SubscriptionV1
@@ -12,15 +13,19 @@ from .utils import decode_datetime, decode_date, decode_attachment, \
     encode_attachment
 
 __all__ = [
-    "logger", "SweetpayClient", "validates", "SUBSCRIPTION", "CREDITCHECK",
-    "CHECKOUT_SESSION"
+    "logger", "SweetpayClient", "validates", "LOGGER_NAME",
+    "SUBSCRIPTION", "CREDITCHECK", "CHECKOUT_SESSION", "errors",
+    "decode_date", "decode_datetime", "decode_attachment",
+    "encode_attachment", "clear_validators", "register_default_validators"
 ]
 
 logger = logging.Logger(LOGGER_NAME)
 
 
 class SweetpayClient(object):
-    """The user-interface for the API."""
+    """The developer-interface for the API.
+
+    Create an instance of this class to gain access to the SDK."""
 
     _RESOURCE_MAPPER = {
         (SubscriptionV1.namespace, 1): SubscriptionV1,

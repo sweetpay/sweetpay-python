@@ -4,8 +4,6 @@ import uuid
 from .constants import SUBSCRIPTION
 from .base import BaseResource, BaseClient
 
-__all__ = ["SubscriptionV1"]
-
 
 class SubscriptionClient(BaseClient):
     """The client used to connect to the checkout API"""

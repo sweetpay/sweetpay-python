@@ -2,8 +2,6 @@
 from .base import BaseClient, BaseResource
 from .constants import CREDITCHECK
 
-__all__ = ["CreditcheckV2"]
-
 
 class CreditcheckClient(BaseClient):
     """The client used to connect to the creditcheck API"""

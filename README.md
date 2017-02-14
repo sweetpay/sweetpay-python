@@ -4,7 +4,9 @@ The documentation of the underlying APIs can be found [here](https://developers.
 
 Some tests have been written for the subscription API, which makes it the currently most stable part of the SDK. 
 
-## API documentations
+Only Python3.3+ is supported. There is currently no plan to implement support for Python2.
+
+## Table of Contents - API Documentations
 1. [Subscription API](#subscription-api)
 
 ## Installation
@@ -32,12 +34,13 @@ resp = client.subscription.search(merchantId="<your-merchant-id>")
 # `None` if JSON wasn't provided. 
 resp.data
 
-# For fetching the HTTP status code.
-resp.code
-
 # For getting the status passed from the server. For 
 # example "OK" or "MISSING_COUNTRY".
 resp.status
+
+# For fetching the HTTP status code. Usually not needed, check 
+# resp.status or the raised exception type instead.
+resp.code
 
 # For fetching the underlying `requests` response. If you don't 
 # know what to use this for, the odds are that you don't have a 
@@ -52,35 +55,34 @@ In order to deserialize the response from the server, the SDK exposes a `validat
 If you don't want any validation for a specific `SweetpayClient` instance, you can remove it by setting `use_validators` to `False` when creating the `SweetpayClient`.
  
 ```python
-from sweetpay import validates
-from sweetpay.utils import decode_datetime, decode_date
+import sweetpay
 
 # The first argument is the resource namespace, the second 
 # argument is the version of the API, and the third argument 
 # is the path to the value. If the path can't be found, the 
 # validator will just be skipped.
-@validates("subscription", 1, ["payload", "startsAt"])
+@sweetpay.validates("subscription", 1, ["payload", "startsAt"])
 def validate_starts_at(value):
-    return decode_date(value)
+    return sweetpay.decode_date(value)
 
 # Just specify a path if you want to set the validator for all
 # resources. This can be handy if you want to do some 
-@validates(["createdAt"])
+@sweetpay.validates(["createdAt"])
 def validate_created_at(value):
-    return decode_datetime(value)
+    return sweetpay.decode_datetime(value)
 ```
 
 This library comes with some validators out-of-the-box. If you want to, you can remove them, or re-add them. This can be a handy trick if you don't want to use any default validators.
 
 ```python
-from sweetpay import clear_validators, register_default_validators
+import sweetpay
 
 # Removes all validators, which in this case is only the 
 # default ones as we haven't added any custom ones.
-clear_validators()
+sweetpay.clear_validators()
 
 # Adds them back again
-register_default_validators()
+sweetpay.register_default_validators()
 ```
 
 For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
@@ -161,10 +163,10 @@ except SweetpayError as e:
 
 ## Testing
 If you want to test your code without sending requests to server, you can easily do so by making use the `mock_resource`. This will simply prevent you from sending any requests from the server, while still validating the mocked data, with the validators registered with the `.validates` decorators.
+
 ```python
 import pytest
 from sweetpay.errors import InvalidParameterError
-from sweetpay.base import ResponseClass
 
 # Testing the successful creation of a subscription
 def test_subscription_creation(client):
@@ -186,6 +188,14 @@ def test_subscription_creation_failure(client):
 ```
 
 Note that the operations can only be mocked on a resource basis. This means that if you mock `client.subscription` then `client.creditcheck` won't automatically be mocked.
+
+For mocking on the actual request level you can use something like [requests-mock](https://github.com/openstack/requests-mock).
+
+## Callbacks
+
+This library provides no helpers for receiving callbacks. You can use something like [Flask](http://flask.pocoo.org/) or [Django](https://www.djangoproject.com/) for that, and then use for example [marshmallow](https://marshmallow.readthedocs.io/en/latest/) to convert the received JSON data into Python objects (`datetime`, `date` etc). 
+
+# API Documentations
 
 ## Subscription API
 

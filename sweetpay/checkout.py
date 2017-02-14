@@ -2,8 +2,6 @@
 from .base import BaseClient, BaseResource
 from .constants import CHECKOUT_SESSION
 
-__all__ = ["CheckoutSessionV1"]
-
 
 class CheckoutClient(BaseClient):
     """The client used to connect to the checkout API"""

@@ -24,8 +24,6 @@ from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     FailureStatusError, ProxyError
 from .constants import DATE_FORMAT, LOGGER_NAME, OK_STATUS
 
-__all__ = ["ResponseClass", "BaseClient", "BaseResource"]
-
 
 class SweetpayJSONEncoder(json.JSONEncoder):
     """A custom JSON encoder to support custom types."""
@@ -433,7 +431,8 @@ class BaseResource(object):
                       status=None):
         """Mock all of the resource's operations.
 
-        This is meant to be used for testing."""
+        This is meant to be used for testing.
+        """
         self.mockexc = raises
         self.mockdata = {
             "code": code, "data": data, "response": response, "status": status

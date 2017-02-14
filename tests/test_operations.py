@@ -44,7 +44,7 @@ def assert_subscription(payload, credit=True):
     assert payload["maxExecutions"] == 4
 
 
-class TestSubscriptionResource:
+class TestSubscriptionV1Resource:
     def test_create(self, client):
         resp = create_subscription(client)
         data = resp.data
@@ -83,7 +83,6 @@ class TestSubscriptionResource:
         assert resp.data["payload"]["state"] == "REGRETTED"
         assert resp.data["payload"]["subscriptionId"] == subscription_id
 
-        # TODO: Should maybe be moved into its own test?
         # It is not regrettable when it has been regretted
         with pytest.raises(FailureStatusError) as excinfo:
             client.subscription.regret(subscription_id)
@@ -110,6 +109,7 @@ class TestSubscriptionResource:
         assert_subscription(subscription)
         assert subscription["merchantItemId"] == identifier
 
+    # TODO: Test with mock instead, this is an API test.
     def test_search_with_no_criteria(self, client):
         with pytest.raises(BadDataError) as excinfo:
             client.subscription.search()
@@ -136,6 +136,7 @@ class TestSubscriptionResource:
         resp = client.subscription.query(subscription_id)
         assert resp.data["payload"]["subscriptionId"] == subscription_id
 
+    # TODO: Test with mock instead, this is actually an API test.
     def test_query_with_nonexistent_resource(self, client):
         with pytest.raises(NotFoundError):
             client.subscription.query(10000)
