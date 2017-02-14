@@ -27,10 +27,10 @@ def decode_datetime(value, to_utc=True):
 
     dt = dateutil.parser.parse(value)
     if to_utc:
-        # NOTE: This wil fail when the datetime is naive or
-        # a date is the value.
-        utc = tz.gettz("UTC")
-        dt = dt.astimezone(utc)
+        # Make sure that it doesn't fail when the datetime is naive
+        if dt.tzinfo is not None:
+            utc = tz.gettz("UTC")
+            dt = dt.astimezone(utc)
     return dt
 
 
