@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
 if __name__ == "__main__":
-    import sweetpay
-    from sweetpay import Subscription, CheckoutSession, Creditcheck
+    from sweetpay import SweetpayClient
     from datetime import date, datetime
 
-    version = {"subscription": 1, "creditcheck": 2}
-    sweetpay.configure(
-        "paylevo", True, version=version)
+    version = {"subscription": 1, "creditcheck": 2, "checkout_session": 1}
+    client = SweetpayClient("paylevo", True, version=version, timeout=5)

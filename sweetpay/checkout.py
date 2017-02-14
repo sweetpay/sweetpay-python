@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from .base import BaseClient, BaseResource
+from .constants import CHECKOUT_SESSION
 
-__all__ = ["CheckoutSession"]
+__all__ = ["CheckoutSessionV1"]
 
 
 class CheckoutClient(BaseClient):
@@ -28,11 +29,11 @@ class CheckoutClient(BaseClient):
         return self.make_request(url, "POST", params)
 
 
-class CheckoutSession(BaseResource):
+class CheckoutSessionV1(BaseResource):
     """The checkout session resource."""
 
     CLIENT_CLS = CheckoutClient
-    namespace = "checkout"
+    namespace = CHECKOUT_SESSION
 
     def create(self, *args, **params):
         """Create a checkout session"""

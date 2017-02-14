@@ -48,29 +48,44 @@ resp.response
 ## Validation and deserialization
 
 In order to deserialize the response from the server, the SDK exposes a `validates` decorator, which can be used to validate JSON returned from the server. The SDK comes packaged with some validators configured, mainly to convert strings to datetime and date objects.
+
+If you don't want any validation for a specific `SweetpayClient` instance, you can remove it by setting `use_validators` to `False` when creating the `SweetpayClient`.
  
 ```python
 from sweetpay import validates
 from sweetpay.utils import decode_datetime, decode_date
 
-# The first argument is the resource as in `client.resource`, and 
-# the second argument is the path to the resource. If the path 
-# can't be found, the validator will just be skipped.
-@validates("subscription", ["payload", "startsAt"])
+# The first argument is the resource namespace, the second 
+# argument is the version of the API, and the third argument 
+# is the path to the value. If the path can't be found, the 
+# validator will just be skipped.
+@validates("subscription", 1, ["payload", "startsAt"])
 def validate_starts_at(value):
     return decode_date(value)
 
 # Just specify a path if you want to set the validator for all
-# resources.
+# resources. This can be handy if you want to do some 
 @validates(["createdAt"])
 def validate_created_at(value):
     return decode_datetime(value)
 ```
 
+This library comes with some validators out-of-the-box. If you want to, you can remove them, or re-add them. This can be a handy trick if you don't want to use any default validators.
+
+```python
+from sweetpay import clear_validators, register_default_validators
+
+# Removes all validators, which in this case is only the 
+# default ones as we haven't added any custom ones.
+clear_validators()
+
+# Adds them back again
+register_default_validators()
+```
+
 For more advanced validation and deserialization, you can use something like [marshmallow](https://marshmallow.readthedocs.io/en/latest/) with the data returned from the SDK. 
 
-If you don't want any validation at all, you can remove it by setting `use_validators` to `False` when creating the `SweetpayClient`.
-
+**WARNING:**  Validators should be used with care. If a validation fails with an exception, you won't gain access to the response.
 
 ## Error handling
 
@@ -161,24 +176,13 @@ def test_subscription_creation(client):
     assert resp.status == "OK"
     assert resp.response is None
 
-# If we instead want to test an exception
+# If we instead want to raise an exception
 def test_subscription_creation_failure(client):
     exc = InvalidParameterError()
     with client.subscription.mock_resource(raises=exc):
         with pytest.raises(InvalidParameterError) as excinfo:
             client.subscription.create(amount=200)
     assert excinfo.value is exc
-   
-# Or simply use your own mocking/patching/monkeypatching. 
-# However, the drawback of this method is that you need to 
-# know something about the internals of the sweetpay library,
-# which may come to change.
-def test_something_with_mock(client, monkeypatch):
-    retval = ResponseClass(
-        data={"status": "OK"}, code=200, status="OK", response=None)
-    monkeypatch.setattr(client.subscription, "create", lambda **kw: retval)
-    resp = client.subscription.create(amount=200)
-    assert resp is retval
 ```
 
 Note that the operations can only be mocked on a resource basis. This means that if you mock `client.subscription` then `client.creditcheck` won't automatically be mocked.

@@ -7,18 +7,20 @@ from sweetpay import BaseResource
 from sweetpay import validates
 
 
+# TODO: May this interfere with other tests when removing the validators?
+
+# We don't want any validators when starting to test.
 def setup_module(module):
     BaseResource.clear_validators()
 
 
+# We remove all validators when we are done with the test.
 def teardown_function():
     BaseResource.clear_validators()
 
 
-# TODO: Clear validators on startup and teardown
-
 def test_validates(client):
-    @validates("subscription", ["test", "path"])
+    @validates("subscription", 1, ["test", "path"])
     def somefunc(value):
         return "changed value"
     with client.subscription.mock_resource(
@@ -34,7 +36,7 @@ def test_validates(client):
 
 
 def test_validates_with_path_not_found(client):
-    @validates("subscription", ["tough"])
+    @validates("subscription", 1, ["tough"])
     def somefunc(value):
         return "changed value"
 
@@ -46,7 +48,7 @@ def test_validates_with_path_not_found(client):
 
 @pytest.mark.parametrize("retdata", [None, []])
 def test_validates_with_invalid_type(client, retdata):
-    @validates("subscription", ["tough"])
+    @validates("subscription", 1, ["tough"])
     def somefunc(value):
         return "changed value"
 
@@ -57,7 +59,7 @@ def test_validates_with_invalid_type(client, retdata):
 
 
 def test_validates_with_empty_path(client):
-    @validates("subscription", [])
+    @validates("subscription", 1, [])
     def somefunc(value):
         assert value == {"hej": "du"}
 
@@ -66,9 +68,11 @@ def test_validates_with_empty_path(client):
         client.subscription.regret(242)
 
 
-def test_validates_with_invalid_namespace():
+@pytest.mark.parametrize(
+    "namespace,version", [("invalid", 1), ("subscription", 10)])
+def test_validates_with_invalid_namespace_and_version(namespace, version):
     with pytest.raises(ValueError):
-        @validates("invalid", ["payload"])
+        @validates(namespace, version, ["payload"])
         def somefunc(value):
             pass
 

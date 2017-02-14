@@ -447,13 +447,6 @@ class BaseResource(object):
             type(self).__name__, self.namespace)
 
 
-@BaseResource.validates("createdAt")
-def validate_created_at(value):
-    if value:
-        return decode_datetime(value)
-    return value
-
-
 def _operation(func):
     """Mark a method or function as an operation."""
     # TODO: Set mock function

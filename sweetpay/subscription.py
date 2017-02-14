@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import uuid
 
+from .constants import SUBSCRIPTION
 from .base import BaseResource, BaseClient
-from .utils import decode_datetime, decode_date
 
-__all__ = ["Subscription"]
+__all__ = ["SubscriptionV1"]
 
 
 class SubscriptionClient(BaseClient):
@@ -50,11 +50,11 @@ class SubscriptionClient(BaseClient):
         return self.make_request(url, "GET")
 
 
-class Subscription(BaseResource):
+class SubscriptionV1(BaseResource):
     """The subscription resource."""
 
     CLIENT_CLS = SubscriptionClient
-    namespace = "subscription"
+    namespace = SUBSCRIPTION
 
     def create(self, *args, **params):
         """Create a subscription."""
@@ -79,37 +79,3 @@ class Subscription(BaseResource):
     def regret(self, *args, **params):
         """Regret a subscription."""
         return self.make_request("regret_subscription", *args, **params)
-
-
-@Subscription.validates("payload", "startsAt")
-def validate_starts_at(value):
-    if value:
-        return decode_date(value)
-    return value
-
-
-@Subscription.validates("payload", "createdAt")
-def validate_payload_created_at(value):
-    if value:
-        return decode_datetime(value)
-    return value
-
-
-@Subscription.validates("payload")
-def validate_payload_when_list(value):
-    if isinstance(value, list):
-        for data in value:
-            # We make a check here as to not break anything if
-            # the API changes.
-            if "createdAt" in data:
-                data["createdAt"] = decode_datetime(data["createdAt"])
-
-            # Check whether we are listing log data or subscriptions
-            if "startsAt" in data:
-                # We are handling subscriptions
-                data["startsAt"] = decode_date(data["startsAt"])
-            elif "sessionId" in data:
-                # We are handling log data. We cannot get here if
-                # the data has a startsAt key.
-                data["sessionId"] = uuid.UUID(data["sessionId"])
-    return value

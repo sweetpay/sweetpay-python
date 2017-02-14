@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from .base import BaseClient, BaseResource
+from .constants import CREDITCHECK
 
-__all__ = ["Creditcheck"]
+__all__ = ["CreditcheckV2"]
 
 
 class CreditcheckClient(BaseClient):
@@ -33,11 +34,11 @@ class CreditcheckClient(BaseClient):
         return self.make_request(url, "POST", params)
 
 
-class Creditcheck(BaseResource):
+class CreditcheckV2(BaseResource):
     """The creditcheck resource."""
 
     CLIENT_CLS = CreditcheckClient
-    namespace = "creditcheck"
+    namespace = CREDITCHECK
 
     def create(self, *args, **params):
         return self.make_request("make_check", *args, **params)

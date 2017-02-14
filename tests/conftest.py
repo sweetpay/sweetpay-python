@@ -10,5 +10,5 @@ from sweetpay import SweetpayClient
 def client():
     # TODO: Create merchant and token for testing
     return SweetpayClient(
-        "paylevo", True, {"subscription": 1, "creditcheck": 2, "checkout": 1},
-        timeout=4)
+        "paylevo", True,
+        {"subscription": 1, "creditcheck": 2, "checkout_session": 1}, 4)
