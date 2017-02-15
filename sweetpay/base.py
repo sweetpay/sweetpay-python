@@ -269,9 +269,8 @@ class BaseResource(object):
 
         # If data is existent, we assume data is a dict, and try
         # to validate all fields.
-        data = respcls.data
-        if data and self.use_validators:
-            data = self.validate_data(data)
+        if respcls.data and self.use_validators:
+            respcls.data = self.validate_data(respcls.data)
         return self.check_for_errors(respcls)
 
     @classmethod
@@ -384,8 +383,8 @@ class BaseResource(object):
         # the BaseResource is always subclassed here.
         # We can ignore keyerrors as _validators is a defaultdict(list).
         validators = chain(cls._validators[cls], cls._validators[BaseResource])
-        for validator in validators:
-            path = validator._dictpath
+        for processor in validators:
+            path = processor._dictpath
             try:
                 value = getfromdict(data, path)
             except (KeyError, TypeError):
@@ -395,21 +394,21 @@ class BaseResource(object):
                 continue
             else:
                 # Validate the field and set the new value
-                validated = validator(value)
+                validatesled = processor(value)
                 # If path is empty, we will just set a new
                 # data variable.
                 if not path:
-                    data = validated
+                    data = validatesled
                 else:
-                    setindict(data, path, validated)
+                    setindict(data, path, validatesled)
         return data
 
     @classmethod
     def validates(cls, *args):
-        """A decorator function used to validate response data.
+        """A decorator function used to validates response data.
 
         :param args: The path (as a list of strings and/or integers)
-                     to the value to validate.
+                     to the value to validates.
         """
         def outer(func):
             # Set the validator on the class
