@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Helper functions.
-"""
+"""Helper functions."""
 import json
 from base64 import b64decode, b64encode
 from functools import reduce

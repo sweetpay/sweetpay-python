@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-
 class SweetpayError(Exception):
     """The base Sweetpay exception. Raised for ambiguous scenarios,
     when no other exception type fits.

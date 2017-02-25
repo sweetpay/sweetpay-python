@@ -1,14 +1,11 @@
-"""
-Test the supported mock interface.
-"""
+"""Test the supported mock interface."""
 from unittest.mock import Mock
 
 import pytest
 
-
+from sweetpay.resources import SubscriptionV1
 from sweetpay.base import ResponseClass
 from sweetpay.errors import NotFoundError
-from sweetpay.subscription import SubscriptionClient
 
 
 class TestMocking:
@@ -30,7 +27,7 @@ class TestMocking:
             return_value=ResponseClass(
                 code=200, status="OK", data=None, response=None))
         monkeypatch.setattr(
-            SubscriptionClient, "create_subscription", mock_create)
+            SubscriptionV1, "create", mock_create)
         client.subscription.create(amount=203)
         mock_create.called_once_with(amount=203)
 

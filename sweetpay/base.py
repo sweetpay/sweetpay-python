@@ -1,8 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-All base classes are defined in this file.
-"""
-
+"""All base classes are defined in this file."""
 import logging
 import os
 import json
@@ -39,7 +35,7 @@ class SweetpayJSONEncoder(json.JSONEncoder):
             return super(SweetpayJSONEncoder, self).default(obj)
 
 
-class ResponseClass(object):
+class ResponseClass:
     """The response class returning response data from API calls."""
 
     def __init__(self, response, code, data, status):
@@ -50,7 +46,7 @@ class ResponseClass(object):
         :param data: The JSON decoded data.
         :param status: The status from Paylevo.
         """
-        super(ResponseClass, self).__init__()
+        super().__init__()
         self.response = response
         self.code = code
         self.data = data
@@ -67,7 +63,7 @@ class ResponseClass(object):
                 self.code, self.status, self.response))
 
 
-class BaseClient(object):
+class SweetpayConnector:
     """The base class used to create API clients."""
 
     def __init__(self, api_token, stage, version, timeout, headers=None,
@@ -101,37 +97,6 @@ class BaseClient(object):
             retries = Retry(total=max_retries)
             adapter = HTTPAdapter(max_retries=retries)
             self.session.mount("https://", adapter)
-
-    @property
-    def stage_url(self):
-        """Return the stage URL."""
-        raise NotImplementedError(
-            "No URL for the stage server has been specified")
-
-    @property
-    def production_url(self):
-        """Return the production URL."""
-        raise NotImplementedError(
-            "No URL for the production server has been specified")
-
-    @property
-    def url(self):
-        """Return the stage or production URL, based on the current context."""
-        if self.stage:
-            url = self.stage_url
-        else:
-            url = self.production_url
-        url = os.path.join(url, "v{0}".format(self.version))
-        return url
-
-    def build_url(self, *args):
-        """Return a URL based on the `url` and a provided path.
-
-        :param args: The arguments which will be used to build the path.
-                For example: "path" and "to" creates the path "/path/to".
-        :return: A complete URL as a string.
-        """
-        return os.path.join(self.url, *args)
 
     def make_request(self, url, method, params=None):
         """Make a request to a passed URL.
@@ -169,8 +134,7 @@ class BaseClient(object):
             reqkwargs["data"] = reqdata
         else:
             raise ValueError(
-                "Only GET and POST requests are allowed, not method=%s",
-                method)
+                "Only GET and POST requests are allowed, not method=%s", method)
 
         try:
             # Send the actual response
@@ -201,26 +165,9 @@ class BaseClient(object):
                 "Could not deserialize JSON for request "
                 "to url=%s, response=%s", url, resp.text)
             data = None
-            status = None
-        else:
-            if isinstance(data, str):
-                # Sometimes a string is returned, which passes the JSON
-                # validation for whatever reason. If that happens,
-                # we set the status to that string as a hacky workaround.
-                status = data
-                data = None
-            else:
-                # Now it's time to extract the status. If no status was
-                # passed, an error will be raised as that shouldn't
-                # be possible.
-                try:
-                    status = data["status"]
-                except KeyError:
-                    # No status was found
-                    status = None
 
         return ResponseClass(
-            response=resp, code=resp.status_code, data=data, status=status)
+            response=resp, code=resp.status_code, data=data, status=None)
 
     def __repr__(self):
         return "<{0}: stage={1}, version={2}>".format(
@@ -229,25 +176,56 @@ class BaseClient(object):
 
 class BaseResource(object):
     """The base resource used to create API resources."""
-    CLIENT_CLS = None
     namespace = None
 
     # The validators.
     _validators = defaultdict(list)
 
-    def __init__(self, use_validators, *client_args, **client_kwargs):
-        self.client = self.CLIENT_CLS(*client_args, **client_kwargs)
+    def __init__(
+            self, use_validators, stage, *connector_args, **connector_kwargs):
+        self.client = SweetpayConnector(
+            *connector_args, stage=stage, **connector_kwargs)
+        self.stage = stage
         self.mockdata = None
         self.mockexc = None
         self.use_validators = use_validators
 
-    def make_request(self, cls_method, *args, **params):
+    @property
+    def stage_url(self):
+        """Return the stage URL."""
+        raise NotImplementedError(
+            "No URL for the stage server has been specified")
+
+    @property
+    def production_url(self):
+        """Return the production URL."""
+        raise NotImplementedError(
+            "No URL for the production server has been specified")
+
+    @property
+    def url(self):
+        """Return the stage or production URL, based on the current context."""
+        if self.stage:
+            url = self.stage_url
+        else:
+            url = self.production_url
+        return url
+
+    def build_url(self, *args):
+        """Return a URL based on the `url` and a provided path.
+
+        :param args: The arguments which will be used to build the path.
+                For example: "path" and "to" creates the path "/path/to".
+        :return: A complete URL as a string.
+        """
+        return os.path.join(self.url, *args)
+
+    def make_request(self, url, method, **params):
         """Make a request through the specified client's method.
 
         If an exception isn't raised, the operation was successful.
 
-        :param cls_method: The method on the client to use.
-        :param args: The args to pass on to the client method.
+        :param method: The method on the client to use.
         :param params: The params to pass to the client method.
         :return: A `ResponseClass` instance.
         """
@@ -264,14 +242,35 @@ class BaseResource(object):
             # let that bubble up. It may also raise a RequestError,
             # but as that is a subclass of SweetpayError we let that
             # bubble up as well.
-            method_callable = getattr(self.client, cls_method)
-            respcls = method_callable(*args, **params)
+            respcls = self.client.make_request(url, method, params)
+
+            # Post process the request.
+            respcls = self.post_request(respcls)
 
         # If data is existent, we assume data is a dict, and try
         # to validate all fields.
         if respcls.data and self.use_validators:
             respcls.data = self.validate_data(respcls.data)
         return self.check_for_errors(respcls)
+
+    def post_request(self, resp):
+        if isinstance(resp.data, str):
+            # Sometimes a string is returned, which passes the JSON
+            # validation for whatever reason. If that happens,
+            # we set the status to that string as a hacky workaround.
+            status = resp.data
+            resp.data = None
+        else:
+            # Now it's time to extract the status. If no status was passed,
+            # we just set the status to None.
+            try:
+                status = resp.data["status"]
+            except (KeyError, TypeError):
+                # No status was found
+                status = None
+
+        resp.status = status
+        return resp
 
     @classmethod
     def clear_validators(cls):
@@ -303,13 +302,12 @@ class BaseResource(object):
         """
         # Set some shortcuts
         code = respcls.code
-        resp = respcls.response
         status = respcls.status
         data = respcls.data
 
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {
-            "code": code, "response": resp, "status": status,
+            "code": code, "response": respcls.response, "status": status,
             "data": data
         }
 

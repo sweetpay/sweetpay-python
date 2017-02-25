@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Tests for all operations.
-"""
-
+"""Tests for all operations."""
+import uuid
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -32,6 +29,18 @@ def create_subscription(client, credit=True, **extra):
         **extra)
 
 
+def create_reservation(client, credit=True, **extra):
+    ssn = TEST_CREDIT_SSN if credit else TEST_NOCREDIT_SSN
+    return client.reservation.create(
+        country="SE", billing={"email": "test@example.com"},
+        merchantId="sweetpay-demo", customer={"ssn": ssn},
+        executeAt=STARTS_AT, reservations={
+            "transactions": [
+                {"amount": {"amount": 101.0, "currency": "SEK"}}
+            ]
+        }, **extra)
+
+
 def assert_subscription(payload, credit=True):
     assert payload["customer"]["address"]["country"] == "SE"
     assert payload["startsAt"] == STARTS_AT
@@ -43,6 +52,15 @@ def assert_subscription(payload, credit=True):
         TEST_NOCREDIT_SSN
     assert payload["maxExecutions"] == 4
 
+
+def assert_reservation(payload, credit=True):
+    assert len(payload) == 1
+    reservation = payload[0]
+    assert reservation["billing"]["email"] == "test@example.com"
+    assert reservation["customer"]["ssn"] == TEST_CREDIT_SSN if credit else \
+        TEST_NOCREDIT_SSN
+    assert reservation["executeAt"] == STARTS_AT
+    assert_isdatetime(reservation["createdAt"])
 
 class TestSubscriptionV1Resource:
     def test_create(self, client):
@@ -147,6 +165,43 @@ class TestSubscriptionV1Resource:
 
         resp = client.subscription.list_log(subscription_id)
         payload = resp.data["payload"]
-        print(payload)
         assert len(payload) > 0
         assert_isdatetime(payload[0]["createdAt"])
+
+
+class TestCheckoutSessionV1Resource:
+    def test_create_session(self, client):
+        resp = client.checkout_session.create(
+            transactions=[{"amount": 100, "currency": "SEK"}],
+            merchantId="paylevo-check",
+            country="SE")
+        assert isinstance(resp.data["payload"]["sessionId"], uuid.UUID)
+        assert_isdatetime(resp.data["createdAt"])
+
+
+class TestCreditCheckV2Resource:
+    @pytest.mark.xfail
+    def test_create_check(self, client):
+        resp = client.creditcheck.create(ssn=TEST_CREDIT_SSN)
+        assert "payload" in resp.data
+
+    def test_search(self, client):
+        resp = client.creditcheck.search(ssn=TEST_CREDIT_SSN)
+        assert "payload" in resp.data
+
+
+@pytest.mark.xfail
+class TestReservationV2Resource:
+    def test_create(self, client):
+        resp = create_reservation(client)
+        assert_reservation(payload = resp.data["payload"])
+
+    def test_regret(self, client):
+        resp = create_reservation(client)
+
+        res_id = resp.data["payload"][0]["reservationId"]
+        resp_2 = client.reservation.regret(res_id)
+        assert resp_2.data["payload"]["state"] == "REGRETTED"
+        assert resp_2.data["payload"]["reservationId"] == res_id
+
+

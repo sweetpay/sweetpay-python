@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
 import logging
 import uuid
 from functools import wraps
 
 from . import errors
 from .constants import LOGGER_NAME, SUBSCRIPTION, CREDITCHECK, CHECKOUT_SESSION
-from .checkout import CheckoutSessionV1
-from .subscription import SubscriptionV1
-from .creditcheck import CreditcheckV2
+from .resources import SubscriptionV1, CreditcheckV2, CheckoutSessionV1
 from .base import BaseResource
 from .utils import decode_datetime, decode_date, decode_attachment, \
     encode_attachment
@@ -169,6 +166,25 @@ def register_default_validators():
                 if "sessionId" in data:
                     # We are handling log data.
                     data["sessionId"] = uuid.UUID(data["sessionId"])
+        return value
+
+    @validates("checkout_session", 1, ["payload", "sessionId"])
+    def validate_starts_at(value):
+        if value:
+            return uuid.UUID(value)
+        return value
+
+    @validates("creditcheck", 2, ["payload"])
+    def validate_payload_when_list(value):
+        if isinstance(value, list):
+            for data in value:
+                # Convert all log entries
+                for log in data.get("log", []):
+                    if "createdAt" in log:
+                        log["createdAt"] = decode_datetime(log["createdAt"])
+                    if "sessionId" in log:
+                        # We are handling log data.
+                        log["sessionId"] = uuid.UUID(log["sessionId"])
         return value
 
 

@@ -5,9 +5,11 @@ Tests for all base functionality.
 import pytest
 
 
-@pytest.mark.xfail
-def test_check_for_errors():
-    raise NotImplementedError
+class TestCheckForErrors:
+
+    @pytest.mark.xfail
+    def test_check_for_errors(self):
+        raise NotImplementedError
 
 
 @pytest.mark.xfail
