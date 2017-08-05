@@ -1,6 +1,5 @@
 """Tests for all operations."""
-import uuid
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sweetpay.constants import TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
@@ -9,26 +8,15 @@ from uuid import uuid4
 
 # The startsAt to use for subscription. It is important that 
 # this isn't today's date, as that is what the subscription 
-# API defaults to.
+# API defaults to. Also, the Sweetpay API does not allow the starstAt
+# to be too far back in time, that's why we don't just hardcode it.
 STARTS_AT = (datetime.utcnow() - timedelta(days=10)).date()
-
-
-def assert_isdatetime(val):
-    assert isinstance(val, datetime)
-
-
-def assert_isdate(val):
-    assert isinstance(val, date)
-
-
-def assert_exc_status(excinfo, status):
-    assert excinfo.value.status == status
 
 
 def create_subscription(client, credit=True, **extra):
     ssn = TEST_CREDIT_SSN if credit else TEST_NOCREDIT_SSN
     return client.subscription.create(
-        amount=10, currency="SEK", country="SE",  merchantId="sweetpay-demo",
+        amount={"amount": 10, "currency": "SEK"}, country="SE",  merchantId="sweetpay-demo",
         interval="MONTHLY", ssn=ssn, startsAt=STARTS_AT, maxExecutions=4,
         **extra)
 
@@ -64,22 +52,22 @@ def assert_reservation(payload, credit=True):
     assert reservation["customer"]["ssn"] == TEST_CREDIT_SSN if credit else \
         TEST_NOCREDIT_SSN
     assert reservation["executeAt"] == STARTS_AT
-    assert_isdatetime(reservation["createdAt"])
 
 
 class TestSubscriptionV1Resource:
     def test_create(self, client):
-        resp = create_subscription(client)
-        data = resp.data
-        payload = data["payload"]
-
-        assert_isdatetime(data["createdAt"])
-        assert_isdate(payload["startsAt"])
-        assert_subscription(payload)
+        # Execute
+        data = create_subscription(client)
+        
+        # Verify
+        assert_subscription(data["payload"])
 
     def test_create_with_no_credit(self, client):
         with pytest.raises(FailureStatusError) as excinfo:
+            # Execute
             create_subscription(client, credit=False)
+            
+        # Verify
         exc = excinfo.value
         assert exc.data
         assert "payload" not in exc.data  # Expecting no payload
@@ -90,27 +78,27 @@ class TestSubscriptionV1Resource:
     #       hack not related to the subscription API
     def test_create_with_missing_amount(self, client):
         with pytest.raises(BadDataError) as excinfo:
+            # Execute
             client.subscription.create(
                 currency="SEK", interval="MONTHLY", ssn=TEST_CREDIT_SSN,
                 merchantId="paylevo", country="SE")
+
+        # Verify
         exc = excinfo.value
         assert exc.status == "Missing amount."
         assert exc.data is None
 
     def test_regret(self, client):
-        resp = create_subscription(client)
-        subscription_id = resp.data["payload"]["subscriptionId"]
-        assert_subscription(resp.data["payload"])
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
 
-        resp = client.subscription.regret(subscription_id)
-        assert resp.data["payload"]["state"] == "REGRETTED"
-        assert resp.data["payload"]["subscriptionId"] == subscription_id
-
-        # It is not regrettable when it has been regretted
-        with pytest.raises(FailureStatusError) as excinfo:
-            client.subscription.regret(subscription_id)
-        exc = excinfo.value
-        assert exc.status == "NOT_MODIFIABLE"
+        # Execute
+        data = client.subscription.regret(subscription_id)
+        
+        # Verify
+        assert data["payload"]["state"] == "REGRETTED"
+        assert data["payload"]["subscriptionId"] == subscription_id
 
     def test_search(self, client):
         # NOTE: merchantItemId should not be used as an identifier.
@@ -119,16 +107,13 @@ class TestSubscriptionV1Resource:
 
         # Use an identifier we can later find
         identifier = str(uuid4())
-        resp = create_subscription(client, merchantItemId=identifier)
-        assert_subscription(resp.data["payload"])
-        assert resp.data["payload"]["merchantItemId"] == identifier
+        create_subscription(client, merchantItemId=identifier)
 
-        resp = client.subscription.search(merchantItemId=identifier)
-        payload = resp.data["payload"]
+        data = client.subscription.search(merchantItemId=identifier)
+        payload = data["payload"]
         assert len(payload) == 1
 
         subscription = payload[0]
-        assert_isdatetime(subscription["createdAt"])
         assert_subscription(subscription)
         assert subscription["merchantItemId"] == identifier
 
@@ -143,21 +128,26 @@ class TestSubscriptionV1Resource:
         assert exc.status == "INVALID_JSON"
 
     def test_update(self, client):
-        resp = create_subscription(client)
-        assert_subscription(resp.data["payload"])
-        subscription_id = resp.data["payload"]["subscriptionId"]
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
 
-        resp = client.subscription.update(subscription_id, maxExecutions=2)
-        assert resp.data["payload"]["subscriptionId"] == subscription_id
-        assert resp.data["payload"]["maxExecutions"] == 2
+        # Execute
+        data = client.subscription.update(subscription_id, maxExecutions=2)
+
+        # Verify
+        assert data["payload"]["maxExecutions"] == 2
 
     def test_query(self, client):
-        resp = create_subscription(client)
-        assert_subscription(resp.data["payload"])
-        subscription_id = resp.data["payload"]["subscriptionId"]
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
 
-        resp = client.subscription.query(subscription_id)
-        assert resp.data["payload"]["subscriptionId"] == subscription_id
+        # Execute
+        data = client.subscription.query(subscription_id)
+
+        # Verify
+        assert data["payload"]["subscriptionId"] == subscription_id
 
     # TODO: Test with mock instead, this is actually an API test.
     def test_query_with_nonexistent_resource(self, client):
@@ -165,48 +155,48 @@ class TestSubscriptionV1Resource:
             client.subscription.query(10000)
 
     def test_list_log(self, client):
-        subresp = create_subscription(client)
-        subscription_id = subresp.data["payload"]["subscriptionId"]
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
 
-        resp = client.subscription.list_log(subscription_id)
-        payload = resp.data["payload"]
+        # Execute
+        data = client.subscription.list_log(subscription_id)
+
+        # Verify
+        payload = data["payload"]
         assert len(payload) > 0
-        assert_isdatetime(payload[0]["createdAt"])
 
 
 class TestCheckoutSessionV1Resource:
     def test_create_session(self, client):
-        resp = client.checkout_session.create(
+        data = client.checkout_session.create(
             transactions=[{"amount": 100, "currency": "SEK"}],
-            merchantId="paylevo-check",
+            merchantId="sweetpay-demo",
             country="SE")
-        assert isinstance(resp.data["payload"]["sessionId"], uuid.UUID)
-        assert_isdatetime(resp.data["createdAt"])
+        assert data
 
 
 class TestCreditCheckV2Resource:
     @pytest.mark.xfail
     def test_create_check(self, client):
-        resp = client.creditcheck.create(ssn=TEST_CREDIT_SSN)
-        assert "payload" in resp.data
+        data = client.creditcheck.create(ssn=TEST_CREDIT_SSN)
+        assert "payload" in data
 
     def test_search(self, client):
-        resp = client.creditcheck.search(ssn=TEST_CREDIT_SSN)
-        assert "payload" in resp.data
+        data = client.creditcheck.search(ssn=TEST_CREDIT_SSN)
+        assert "payload" in data
 
 
 @pytest.mark.xfail
 class TestReservationV2Resource:
     def test_create(self, client):
-        resp = create_reservation(client)
-        assert_reservation(payload=resp.data["payload"])
+        data = create_reservation(client)
+        assert_reservation(payload=data["payload"])
 
     def test_regret(self, client):
-        resp = create_reservation(client)
+        data = create_reservation(client)
 
-        res_id = resp.data["payload"][0]["reservationId"]
+        res_id = data["payload"][0]["reservationId"]
         resp_2 = client.reservation.regret(res_id)
         assert resp_2.data["payload"]["state"] == "REGRETTED"
         assert resp_2.data["payload"]["reservationId"] == res_id
-
-

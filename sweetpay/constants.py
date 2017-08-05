@@ -7,7 +7,7 @@ OK_STATUS = "OK"
 LOGGER_NAME = "sweetpay-sdk"
 
 # Define some test data for SE
-TEST_CREDIT_SSN = "19500101-0001"
+TEST_CREDIT_SSN = "19500101-0002"
 TEST_NOCREDIT_SSN = "19500101-0007"
 
 # All resource namespaces
