@@ -21,6 +21,10 @@ def assert_isdate(val):
     assert isinstance(val, date)
 
 
+def assert_exc_status(excinfo, status):
+    assert excinfo.value.status == status
+
+
 def create_subscription(client, credit=True, **extra):
     ssn = TEST_CREDIT_SSN if credit else TEST_NOCREDIT_SSN
     return client.subscription.create(
@@ -61,6 +65,7 @@ def assert_reservation(payload, credit=True):
         TEST_NOCREDIT_SSN
     assert reservation["executeAt"] == STARTS_AT
     assert_isdatetime(reservation["createdAt"])
+
 
 class TestSubscriptionV1Resource:
     def test_create(self, client):
@@ -194,7 +199,7 @@ class TestCreditCheckV2Resource:
 class TestReservationV2Resource:
     def test_create(self, client):
         resp = create_reservation(client)
-        assert_reservation(payload = resp.data["payload"])
+        assert_reservation(payload=resp.data["payload"])
 
     def test_regret(self, client):
         resp = create_reservation(client)

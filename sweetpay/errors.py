@@ -26,7 +26,7 @@ class SweetpayError(Exception):
 
     def __init__(self, msg=None, data=None, response=None, code=None,
                  status=None, exc=None):
-        super(SweetpayError, self).__init__(self, msg)
+        super().__init__(msg)
         self.data = data
         self.response = response
         self.code = code
@@ -44,6 +44,13 @@ class SweetpayError(Exception):
     def is_json(self):
         """Return a boolean to indicate if the resp data is JSON."""
         return self.data is not None
+
+    def to_dict(self):
+        """Convert the exception data to a dictionary."""
+        return {
+            "data": self.data, "response": self.response, "code": self.code,
+            "status": self.status, "exc": self.exc, "msg": self.args[0]
+        }
 
 
 class FailureStatusError(SweetpayError):
