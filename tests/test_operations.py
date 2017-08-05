@@ -16,7 +16,7 @@ STARTS_AT = (datetime.utcnow() - timedelta(days=10)).date()
 def create_subscription(client, credit=True, **extra):
     ssn = TEST_CREDIT_SSN if credit else TEST_NOCREDIT_SSN
     return client.subscription.create(
-        amount={"amount": 10, "currency": "SEK"}, country="SE",  merchantId="sweetpay-demo",
+        amount=10, currency="SEK", country="SE",  merchantId="sweetpay-demo",
         interval="MONTHLY", ssn=ssn, startsAt=STARTS_AT, maxExecutions=4,
         **extra)
 
