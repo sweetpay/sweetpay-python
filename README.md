@@ -53,18 +53,22 @@ except FailureStatusError as e:
     # Whenever you get this, you would do best to inspect the 
     # status, to figure out what went wrong. 
     if e.status == "NOT_MODIFIABLE":
-        print("Oh, the subscription can't be modified")
+        print(
+            "The subscription can't be modified, possibly "
+            "because it's regretted or expired")
     else:
-        print("Oh, something else happened")
+        print("Something else went wrong")
         
 except UnauthorizedError as e:
-    # You are simply unauthorized. Check your API token, 
-    # or contact Sweetpay's developer to configure it correctly.
+    # You are simply unauthorized. Make sure your
+    # API token is indeed correct.
     print("Incorrect API token!")
     
 except NotFoundError as e:
     # The resource ID (e.g. `subscription_id`) did not match 
-    # an existing resource.
+    # an existing resource. Can also be raised if an API endpoint
+    # isn't found; in that case, something is wrong with the API
+    # client and a bug report should be filed.
     print("The resource couldn't be found on the server")
 
 except ProxyError as e:
@@ -83,8 +87,7 @@ except UnderMaintenanceError as e:
     print("The API is under maintenance.")
 
 except (BadDataError, InvalidParameterError) as e:
-    # Inspect `e.data`, `e.status` or both. `e.data` is 
-    # sometimes `None` in this case, so be wary.
+    # Inspect `e.status` or `e.data`.
     print("You passed bad data to the server")
 
 except InternalServerError as e:
@@ -104,12 +107,29 @@ except RequestError as e:
     print("The real exception:", e.exc)
 
 except SweetpayError as e:
-    # The parent of all errors. 
+    # The parent of all errors.
     print("You can catch all errors with this one")
 ```
 
-## Testing
-If you want to test your code without sending requests to server, you can easily do so by making use the `mock`.
+It should be noted that every exception has a `.to_dict` method which can be used to get the `status`, `data`, etc. in a dictionary. This can in turn be used for logging. For example:
+
+```python
+import logging
+
+# Get your logger instance
+logger = logging.getLogger(__name__)
+
+try:
+    client.subscription.search()
+except SweetpayError as e:
+    # Something went wrong, let's log it.
+    data = e.to_dict()
+    logger.error(
+        "Could not search subscriptions, exception data: %s", str(data))
+```
+
+## Testing & Mocking
+If you want to test your code without sending requests to server, you can easily do so by making use of the `mock` method of each API operation. All arguments passed to the `mock` method will be passed to the `__init__` method of `unittest.mock.Mock`.
 
 ```python
 import pytest
@@ -132,6 +152,10 @@ def test_subscription_creation_failure(client):
 ```
 
 For mocking on the actual request level you can for example use [requests-mock](https://github.com/openstack/requests-mock). However, this is discouraged, since that would rely on the internals of the library.
+
+Instead of using the built-in mocking support (which is just a convenience wrapper around `unittest.mock.Mock()`), you could of course do the mocking manually yourself. You could need to do the mocking yourself if you don't have a global instance of `sweetpay.SweetpayClient`.
+
+**NOTE**: The mocking support is not thread-safe if you are using a global instance of `sweetpay.SweetpayClient`.
 
 ## Callbacks & Deserialization
 
@@ -156,7 +180,7 @@ from decimal import Decimal
 resp = client.subscription.create(
     amount=Decimal("200.0"), currency="SEK", 
     country="SE", merchantId="<your-merchant-id>",
-    interval="MONTHLY", ssn="19500101-0001",
+    interval="MONTHLY", ssn="19500101-0002",
     startsAt=datetime.utcnow().date())
 ```
 
@@ -164,28 +188,28 @@ resp = client.subscription.create(
 Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#update-a-subscription) for the API documentation and the available parameters.
 
 ```python
-resp = client.subscription.update(subscription_id, maxExecutions=4)
+data = client.subscription.update(subscription_id, maxExecutions=4)
 ```
 
 ### Regret a subscription
 Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#regret-a-subscription) for the API documentation and the available parameters.
 ```python
-resp = client.subscription.regret(subscription_id)
+data = client.subscription.regret(subscription_id)
 ```
 
 ### Query a subscription
 Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#query-a-subscription) for the API documentation and the available parameters.
 ```python
-resp = client.subscription.query(subscription_id)
+data = client.subscription.query(subscription_id)
 ```
 
 ### Search for subscriptions
 Follow [this link](https://developers.sweetpayments.com/docs/subscription/apiref/#search-for-subscriptions) for the API documentation and the available parameters.
 ```python
-resp = client.subscription.search(country="SE")
+data = client.subscription.search(country="SE")
 ```
 
 ### Listing the log for a subscription
 ```python
-resp = client.subscription.list_log(subscription_id)
+data = client.subscription.list_log(subscription_id)
 ```
