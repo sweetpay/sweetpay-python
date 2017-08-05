@@ -1,13 +1,14 @@
 """Helper functions."""
 import json
+import logging
 from base64 import b64decode, b64encode
-from functools import reduce
-import operator
 
 import dateutil.parser
 from dateutil import tz
 from datetime import datetime
-from .constants import DATE_FORMAT
+from .constants import DATE_FORMAT, LOGGER_NAME
+
+logger = logging.Logger(LOGGER_NAME)
 
 
 def decode_datetime(value, to_utc=True):
@@ -40,16 +41,6 @@ def decode_date(value):
     # We cannot convert the datetime to utc, as the
     # starts_at is based on a Swedish datetime
     return datetime.strptime(value, DATE_FORMAT).date()
-
-
-def getfromdict(datadict, maplist):
-    """Get an item from a dict, based on a list of keys."""
-    return reduce(operator.getitem, maplist, datadict)
-
-
-def setindict(datadict, maplist, value):
-    """Set an item in a dict, based on a list of keys."""
-    getfromdict(datadict, maplist[:-1])[maplist[-1]] = value
 
 
 def encode_attachment(attachment):

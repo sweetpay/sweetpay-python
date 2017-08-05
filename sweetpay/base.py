@@ -1,24 +1,23 @@
 """All base classes are defined in this file."""
-import logging
 import os
 import json
 import datetime
 from contextlib import contextmanager
 from decimal import Decimal
-from itertools import chain
 
 import requests
-from collections import defaultdict
+
+from unittest.mock import Mock
 from requests import Session
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3 import Retry
 
-from .utils import setindict, getfromdict, decode_datetime
+from .utils import logger
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
     InternalServerError, UnderMaintenanceError, UnauthorizedError, \
     NotFoundError, TimeoutError, RequestError, MethodNotAllowedError, \
     FailureStatusError, ProxyError
-from .constants import DATE_FORMAT, LOGGER_NAME, OK_STATUS
+from .constants import DATE_FORMAT, OK_STATUS
 
 
 class SweetpayJSONEncoder(json.JSONEncoder):
@@ -31,8 +30,7 @@ class SweetpayJSONEncoder(json.JSONEncoder):
         elif isinstance(obj, Decimal):
             # String, as we want it money safe.
             return str(obj)
-        else:
-            return super(SweetpayJSONEncoder, self).default(obj)
+        return super(SweetpayJSONEncoder, self).default(obj)
 
 
 class ResponseClass:
@@ -46,7 +44,6 @@ class ResponseClass:
         :param data: The JSON decoded data.
         :param status: The status from Paylevo.
         """
-        super().__init__()
         self.response = response
         self.code = code
         self.data = data
@@ -83,7 +80,7 @@ class SweetpayConnector:
         self.stage = stage
         self.version = version
         self.timeout = timeout
-        self.logger = logging.getLogger(LOGGER_NAME)
+        self.logger = logger
 
         self.session = Session()
         self.session.headers.update({
@@ -124,7 +121,7 @@ class SweetpayConnector:
         elif method == "POST":
             if params:
                 # Encode the data to JSON
-                reqdata = SweetpayJSONEncoder().encode(params)
+                reqdata = self.get_json_encoder().encode(params)
             else:
                 # Use an empty body
                 reqdata = {}
@@ -137,7 +134,7 @@ class SweetpayConnector:
                 "Only GET and POST requests are allowed, not method=%s", method)
 
         try:
-            # Send the actual response
+            # Send the actual request
             resp = self.session.request(method=method, url=url, **reqkwargs)
         except requests.Timeout as e:
             # If the request timed out.
@@ -157,17 +154,23 @@ class SweetpayConnector:
                 "status_code=%d and body=%s", resp.status_code, url, method,
                 resp.text)
 
+        # Try to decode the (hopefully) JSON response
         try:
-            # Try to decode the (hopefully) JSON response
             data = resp.json()
         except (TypeError, ValueError):
             logger.error(
                 "Could not deserialize JSON for request "
                 "to url=%s, response=%s", url, resp.text)
-            data = None
+            data = resp.text
 
         return ResponseClass(
             response=resp, code=resp.status_code, data=data, status=None)
+
+    def get_json_encoder(self):
+        """Return the JSON encoder to use for encoding request data.
+
+        This method may be overwritten to provide your own JSON encoder."""
+        return SweetpayJSONEncoder()
 
     def __repr__(self):
         return "<{0}: stage={1}, version={2}>".format(
@@ -178,17 +181,10 @@ class BaseResource(object):
     """The base resource used to create API resources."""
     namespace = None
 
-    # The validators.
-    _validators = defaultdict(list)
-
-    def __init__(
-            self, use_validators, stage, *connector_args, **connector_kwargs):
+    def __init__(self, stage, *connector_args, **connector_kwargs):
         self.client = SweetpayConnector(
             *connector_args, stage=stage, **connector_kwargs)
         self.stage = stage
-        self.mockdata = None
-        self.mockexc = None
-        self.use_validators = use_validators
 
     @property
     def stage_url(self):
@@ -220,7 +216,7 @@ class BaseResource(object):
         """
         return os.path.join(self.url, *args)
 
-    def make_request(self, url, method, **params):
+    def api_call(self, url, method, **params):
         """Make a request through the specified client's method.
 
         If an exception isn't raised, the operation was successful.
@@ -230,30 +226,22 @@ class BaseResource(object):
         :return: A `ResponseClass` instance.
         """
 
-        # Check if we are in mocking mode or not.
-        if self.is_mocked:
-            if self.mockexc:
-                raise self.mockexc
-            else:
-                respcls = ResponseClass(**self.mockdata)
-        else:
-            # Call the actual method. Note that this may raise an
-            # AttributeError if the method doesn't exist, but we
-            # let that bubble up. It may also raise a RequestError,
-            # but as that is a subclass of SweetpayError we let that
-            # bubble up as well.
-            respcls = self.client.make_request(url, method, params)
+        # Call the actual method. Note that this may raise an
+        # AttributeError if the method doesn't exist, but we
+        # let that bubble up. It may also raise a RequestError,
+        # but as that is a subclass of SweetpayError we let that
+        # bubble up as well.
+        respcls = self.client.make_request(url, method, params)
 
-            # Post process the request.
-            respcls = self.post_request(respcls)
+        # Post process the request.
+        respcls = self.post_request(respcls)
 
-        # If data is existent, we assume data is a dict, and try
-        # to validate all fields.
-        if respcls.data and self.use_validators:
-            respcls.data = self.validate_data(respcls.data)
-        return self.check_for_errors(respcls)
+        return self.check_for_errors(
+            code=respcls.code, data=respcls.data, status=respcls.status,
+            response=respcls.response)
 
     def post_request(self, resp):
+        # Now it's time to extract the status.
         if isinstance(resp.data, str):
             # Sometimes a string is returned, which passes the JSON
             # validation for whatever reason. If that happens,
@@ -261,8 +249,7 @@ class BaseResource(object):
             status = resp.data
             resp.data = None
         else:
-            # Now it's time to extract the status. If no status was passed,
-            # we just set the status to None.
+            # If no status was passed, we just set the status to None.
             try:
                 status = resp.data["status"]
             except (KeyError, TypeError):
@@ -273,11 +260,7 @@ class BaseResource(object):
         return resp
 
     @classmethod
-    def clear_validators(cls):
-        cls._validators = defaultdict(list)
-
-    @classmethod
-    def check_for_errors(cls, respcls):
+    def check_for_errors(cls, code, status, data, response):
         """Inspect a response for errors.
 
         This method must raise relevant exceptions or return some
@@ -285,7 +268,10 @@ class BaseResource(object):
         to raise exceptions based on the code/status, or return
         the ResponseClass if all is well.
 
-        :param respcls: An instance of a ResponseClass.
+        :param code: The HTTP code returned from the server.
+        :param status: The status returned from the server.
+        :param data: The data returned from the server.
+        :param response: The actual response returned from the server.
         :raise BadDataError: If the HTTP status code is 400.
         :raise InvalidParameterError: If the HTTP status code is 422.
         :raise InternalServerError: If an internal server error occurred
@@ -298,24 +284,20 @@ class BaseResource(object):
         :raise ProxyError: If a proxy error occurred.
         :raise TimeoutError: If a request timeout occurred.
         :raise RequestError: If an unhandled request error occurred.
-        :return: A `ResponseClass` instance.
+        :return: A dictionary representing the data from the server.
         """
-        # Set some shortcuts
-        code = respcls.code
-        status = respcls.status
-        data = respcls.data
 
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {
-            "code": code, "response": respcls.response, "status": status,
+            "code": code, "response": response, "status": status,
             "data": data
         }
 
         # Check if the response was successful.
         if code == 200:
-            if respcls.status_ok:
-                # If all OK, return the response.
-                return respcls
+            if status == OK_STATUS:
+                # If all OK, return the JSON data.
+                return data
             else:
                 raise FailureStatusError(
                     "The passed status={0} is not the OK_STATUS={1}, "
@@ -369,84 +351,32 @@ class BaseResource(object):
             raise SweetpayError(
                 "Something went wrong in the request", **exc_kwargs)
 
-    @classmethod
-    def validate_data(cls, data):
-        """Validate data response data from the server.
-
-        This function assumed that data is a valid response
-        from the server.
-        """
-        # Iterate through both the current iterators, and the
-        # base resources iterator. Note that we assume that
-        # the BaseResource is always subclassed here.
-        # We can ignore keyerrors as _validators is a defaultdict(list).
-        validators = chain(cls._validators[cls], cls._validators[BaseResource])
-        for processor in validators:
-            path = processor._dictpath
-            try:
-                value = getfromdict(data, path)
-            except (KeyError, TypeError):
-                # If no value found, we screw it and continue.
-                # A KeyError and TypeError are possible, depending
-                # on the structure of the response
-                continue
-            else:
-                # Validate the field and set the new value
-                validatesled = processor(value)
-                # If path is empty, we will just set a new
-                # data variable.
-                if not path:
-                    data = validatesled
-                else:
-                    setindict(data, path, validatesled)
-        return data
-
-    @classmethod
-    def validates(cls, *args):
-        """A decorator function used to validates response data.
-
-        :param args: The path (as a list of strings and/or integers)
-                     to the value to validates.
-        """
-        def outer(func):
-            # Set the validator on the class
-            func._dictpath = args
-            cls._validators[cls].append(func)
-            def inner(*args, **kwargs):
-                # Call the decorated function
-                return func(*args, **kwargs)
-            return inner
-        return outer
-
-    @property
-    def is_mocked(self):
-        """Return a value to indicate whether the resource is mocked or not."""
-        return self.mockexc is not None or self.mockdata is not None
-
-    @contextmanager
-    def mock_resource(self, raises=None, code=None, data=None, response=None,
-                      status=None):
-        """Mock all of the resource's operations.
-
-        This is meant to be used for testing.
-        """
-        self.mockexc = raises
-        self.mockdata = {
-            "code": code, "data": data, "response": response, "status": status
-        }
-        yield
-        self.mockdata = None
-        self.mockexc = None
-
     def __repr__(self):
         return "<{0}: namespace={1}>".format(
             type(self).__name__, self.namespace)
 
 
-def _operation(func):
-    """Mark a method or function as an operation."""
-    # TODO: Set mock function
-    # TODO: Set validator?
-    def inner(*args, **kwargs):
-        return func(*args, **kwargs)
-    raise NotImplementedError
+def mock_manager(func):
+    func._mock = None
+
+    @contextmanager
+    def manager(*args, **kwargs):
+        func._mock = Mock(*args, **kwargs)
+        yield func._mock
+        func._mock = None
+
+    return manager
+
+
+def operation(func):
+    def inner(self, *args, **kwargs):
+        # Call the mock if we are in mock mode.
+        if func._mock:
+            # We do not include self in the call, since that will
+            # make the mock's assert helpers act crazy.
+            return func._mock(*args, **kwargs)
+        # If we are not mocking, call the actual function.
+        return func(self, *args, **kwargs)
+    # Create a mock manager.
+    inner.mock = mock_manager(func)
+    return inner

@@ -15,53 +15,40 @@ class TestMocking:
     or you should rewrite the code. You decide.
     """
 
-    def assert_resp(self, resp):
-        assert resp.data == {"status": "OK"}
-        assert resp.code == 200
-        assert resp.status == "OK"
-        assert resp.response == 123
+    def test_mock_is_added(self, client):
+        with client.subscription.create.mock() as mock:
+            assert mock() == client.subscription.create()
 
-    def assert_removed_mock(self, client, monkeypatch):
-        """Ensure sure that the mock was actually removed."""
-        mock_create = Mock(
-            return_value=ResponseClass(
-                code=200, status="OK", data=None, response=None))
-        monkeypatch.setattr(
-            SubscriptionV1, "create", mock_create)
-        client.subscription.create(amount=203)
-        mock_create.called_once_with(amount=203)
+    def test_mock_called(self, client):
+        with client.subscription.create.mock() as mock:
+            client.subscription.create(1, test=2)
+            assert mock.assert_called_once_with(1, test=2)
 
-    def test_all_operations_with_return_value(self, client, monkeypatch):
-        assert client.subscription.is_mocked is False
-        with client.subscription.mock_resource(
-                data={"status": "OK"}, code=200, status="OK", response=123):
-            assert client.subscription.is_mocked is True
-            resp_1 = client.subscription.regret(242)
-            resp_2 = client.subscription.create(amount=303)
-        self.assert_resp(resp_1)
-        self.assert_resp(resp_2)
+    def test_return_value(self, client):
+        # Setup
+        with client.subscription.create.mock(return_value={"status": "OK"}):
+            # Execute
+            data = client.subscription.create()
+        # Verify
+        assert data == {"status": "OK"}
 
-        assert client.subscription.is_mocked is False
-        self.assert_removed_mock(client, monkeypatch)
-
-    def test_all_operations_with_exception(self, client, monkeypatch):
+    def test_with_exception(self, client):
+        # Setup
         exc = NotFoundError()
-        assert client.subscription.is_mocked is False
+        with client.subscription.regret.mock(side_effect=exc):
+            # Verify
+            with pytest.raises(NotFoundError):
+                # Execute
+                client.subscription.regret(242)
 
-        with client.subscription.mock_resource(raises=exc), \
-                pytest.raises(NotFoundError) as excinfo:
-            assert client.subscription.is_mocked is True
+    def test_mock_is_removed(self, client):
+        # Setup and execute
+        with client.subscription.create.mock() as mock:
+            client.subscription.create()
+        # Verify
+        assert client.subscription.create() != mock
+
+    def test_mock_only_affects_one_operation(self, client):
+        with client.subscription.create.mock() as mock:
             client.subscription.regret(242)
-            client.subscription.create(amount=242)
-
-        assert client.subscription.is_mocked is False
-        assert excinfo.value is exc
-        self.assert_removed_mock(client, monkeypatch)
-
-
-def test_something_with_mock(client, monkeypatch):
-    retval = ResponseClass(
-        data={"status": "OK"}, code=200, status="OK", response=None)
-    monkeypatch.setattr(client.subscription, "create", lambda **kw: retval)
-    resp = client.subscription.create(amount=200)
-    assert resp is retval
+        mock.assert_not_called()
