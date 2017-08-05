@@ -217,7 +217,7 @@ class BaseResource(object):
         return os.path.join(self.url, *args)
 
     def api_call(self, url, method, **params):
-        """Make a request through the specified client's method.
+        """Make an API call.
 
         If an exception isn't raised, the operation was successful.
 
@@ -379,4 +379,6 @@ def operation(func):
         return func(self, *args, **kwargs)
     # Create a mock manager.
     inner.mock = mock_manager(func)
+    # We set this to easy testing
+    inner._func = func
     return inner

@@ -15,14 +15,26 @@ class TestMocking:
     or you should rewrite the code. You decide.
     """
 
-    def test_mock_is_added(self, client):
+    def test_no_mock_when_not_mocking(self, client):
+        assert not client.subscription.create._func._mock
+
+    def test_mock_when_mocking(self, client):
         with client.subscription.create.mock() as mock:
-            assert mock() == client.subscription.create()
+            assert client.subscription.create._func._mock is mock
+
+    def test_mock_removed_after_mocking(self, client):
+        with client.subscription.create.mock():
+            pass
+        assert not client.subscription.create._func._mock
+
+    def test_mock_is_isolated_to_one_method(self, client):
+        with client.subscription.create.mock():
+            assert not client.subscription.search._func._mock
 
     def test_mock_called(self, client):
         with client.subscription.create.mock() as mock:
             client.subscription.create(1, test=2)
-            assert mock.assert_called_once_with(1, test=2)
+        mock.assert_called_once_with(1, test=2)
 
     def test_return_value(self, client):
         # Setup
@@ -40,15 +52,3 @@ class TestMocking:
             with pytest.raises(NotFoundError):
                 # Execute
                 client.subscription.regret(242)
-
-    def test_mock_is_removed(self, client):
-        # Setup and execute
-        with client.subscription.create.mock() as mock:
-            client.subscription.create()
-        # Verify
-        assert client.subscription.create() != mock
-
-    def test_mock_only_affects_one_operation(self, client):
-        with client.subscription.create.mock() as mock:
-            client.subscription.regret(242)
-        mock.assert_not_called()
