@@ -166,14 +166,39 @@ class TestSubscriptionV1Resource:
         payload = data["payload"]
         assert len(payload) > 0
 
+    def test_extend(self, client):
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
+
+        # Execute
+        data = client.subscription.extend(subscription_id, maxExecutions=5)
+
+        # Verify
+        assert data
+
+    def test_expire(self, client):
+        # Setup
+        data = create_subscription(client)
+        subscription_id = data["payload"]["subscriptionId"]
+
+        # Execute
+        data = client.subscription.expire(subscription_id)
+
+        # Verify
+        assert data
+
 
 class TestCheckoutSessionV1Resource:
     def test_create_session(self, client):
+        # Execute
         data = client.checkout_session.create(
             transactions=[{"amount": 100, "currency": "SEK"}],
             merchantId="sweetpay-demo",
             country="SE")
-        assert data
+
+        # Verify
+        assert data["payload"]
 
 
 class TestCreditCheckV2Resource:
