@@ -3,7 +3,7 @@ import logging
 from . import errors
 from .constants import SUBSCRIPTION, CREDITCHECK, CHECKOUT_SESSION
 from .resources import SubscriptionV1, CreditcheckV2, CheckoutSessionV1
-from .base import BaseResource
+from .base import BaseResource, SweetpayConnector
 from .utils import decode_datetime, decode_date, decode_attachment, \
     encode_attachment
 
@@ -26,8 +26,7 @@ class SweetpayClient:
         (None, None): BaseResource
     }
 
-    def __init__(self, api_token, stage, version, timeout=15,
-                 use_validators=True):
+    def __init__(self, api_token, stage, version, timeout=15, connector=None):
         """Configure the API with default values.
 
         :param api_token: The API token provided by SweetPay.
@@ -36,14 +35,14 @@ class SweetpayClient:
         :param version: A mapping/dict indicating which versions of
                         the APIs to use.
         :param timeout: Optional. The request timeout, defaults to 15.
-        :param use_validators: Optional. Whether to use the validator
-                               functionality. Defaults to `True`.
+        :param connector: The connector to use for contacting the API.
+            Defaults to SweetpayConnector.
         """
         self.api_token = api_token
         self.stage = stage
         self.version = version
         self.timeout = timeout
-        self.use_validators = use_validators
+        self.connector = connector or SweetpayConnector
 
         # Create the resources.
         for namespace, version in version.items():
@@ -63,5 +62,6 @@ class SweetpayClient:
     def _get_resource_arguments(self, namespace):
         return {
             "api_token": self.api_token, "stage": self.stage,
-            "version": self.version[namespace], "timeout": self.timeout
+            "version": self.version[namespace], "timeout": self.timeout,
+            "connector": self.connector
         }

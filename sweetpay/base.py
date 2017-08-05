@@ -115,9 +115,11 @@ class SweetpayConnector:
         # Set default values for the request args and kwargs.
         reqkwargs = {"timeout": self.timeout}
 
+        logger.info("Sending request with method=%s to url=%s", method, url)
+
         # Handle the method types appropriately
         if method == "GET":
-            logger.info("Sending request with method=GET to url=%s", url)
+            pass
         elif method == "POST":
             if params:
                 # Encode the data to JSON
@@ -125,13 +127,18 @@ class SweetpayConnector:
             else:
                 # Use an empty body
                 reqdata = {}
-            logger.info(
-                "Sending request with method=POST to url=%s and "
-                "parameters=%s", url, reqdata)
+            # Debug logging since this may be sensitive data.
+            logger.debug("Sending data=%s", reqdata)
+            # Set the data to send in the dictionary to pass to the
+            # request.
             reqkwargs["data"] = reqdata
         else:
             raise ValueError(
-                "Only GET and POST requests are allowed, not method=%s", method)
+                "Only GET and POST requests are allowed, not method=%s",
+                method)
+
+        # Pre process the request data.
+        reqkwargs = self.pre_process_request(method, url, reqkwargs)
 
         try:
             # Send the actual request
@@ -150,9 +157,10 @@ class SweetpayConnector:
                 response=None, exc=e)
         else:
             logger.info(
-                "Sent request to url=%s and method=%s, received "
-                "status_code=%d and body=%s", resp.status_code, url, method,
-                resp.text)
+                "Sent request to url=%s and method=%s, "
+                "received status_code=%d", url, method, resp.status_code)
+            logger.debug(
+                "Received body=%s", resp.text)
 
         # Try to decode the (hopefully) JSON response
         try:
@@ -163,8 +171,53 @@ class SweetpayConnector:
                 "to url=%s, response=%s", url, resp.text)
             data = resp.text
 
-        return ResponseClass(
+        # Create the representation of the response.
+        respcls = ResponseClass(
             response=resp, code=resp.status_code, data=data, status=None)
+        # Post process the request.
+        respcls = self.post_process_request(respcls)
+        return respcls
+
+    def pre_process_request(self, method, url, reqkwargs):
+        """Pre process the request.
+
+        :param method: The method used. Can not be modified.
+        :param url: The URL to send the request to. Can not be modified.
+        :param reqkwargs: The keyword arguments to send to the
+            underlying `requests` call. `data` may be present in
+            the dictionary if this is a POST request.
+        :return: The reqkwargs to give to the underyling `requests` call.
+        """
+        return reqkwargs
+
+    def post_process_request(self, resp):
+        """Process the ResponseClass directly after the request was made.
+
+        If you override this method, it is recommended that you call
+        super() first and then do your own post processing..
+
+        :param resp: An instance of ResponseClass, representing the response data.
+        :return: Must return an instance of ResponseClass. It is
+            recommended to return the same instance that
+            was passed in.
+        """
+        # Now it's time to extract the status.
+        if isinstance(resp.data, str):
+            # Sometimes a string is returned, which passes the JSON
+            # validation for whatever reason. If that happens,
+            # we set the status to that string as a hacky workaround.
+            status = resp.data
+            resp.data = None
+        else:
+            # If no status was passed, we just set the status to None.
+            try:
+                status = resp.data["status"]
+            except (KeyError, TypeError):
+                # No status was found
+                status = None
+
+        resp.status = status
+        return resp
 
     def get_json_encoder(self):
         """Return the JSON encoder to use for encoding request data.
@@ -181,8 +234,8 @@ class BaseResource(object):
     """The base resource used to create API resources."""
     namespace = None
 
-    def __init__(self, stage, *connector_args, **connector_kwargs):
-        self.client = SweetpayConnector(
+    def __init__(self, stage, connector, *connector_args, **connector_kwargs):
+        self.client = connector(
             *connector_args, stage=stage, **connector_kwargs)
         self.stage = stage
 
@@ -233,31 +286,12 @@ class BaseResource(object):
         # bubble up as well.
         respcls = self.client.make_request(url, method, params)
 
-        # Post process the request.
-        respcls = self.post_request(respcls)
-
+        # The last thing we do is to check for errors. If an error
+        # was found, raise an exception. If no error is found, a
+        # dictionary of the response data is returned.
         return self.check_for_errors(
             code=respcls.code, data=respcls.data, status=respcls.status,
             response=respcls.response)
-
-    def post_request(self, resp):
-        # Now it's time to extract the status.
-        if isinstance(resp.data, str):
-            # Sometimes a string is returned, which passes the JSON
-            # validation for whatever reason. If that happens,
-            # we set the status to that string as a hacky workaround.
-            status = resp.data
-            resp.data = None
-        else:
-            # If no status was passed, we just set the status to None.
-            try:
-                status = resp.data["status"]
-            except (KeyError, TypeError):
-                # No status was found
-                status = None
-
-        resp.status = status
-        return resp
 
     @classmethod
     def check_for_errors(cls, code, status, data, response):
@@ -357,28 +391,38 @@ class BaseResource(object):
 
 
 def mock_manager(func):
+    """Wrapper that returns a contextmanager for mocking API calls."""
+    # The mock which gets set when in mocking mode.
     func._mock = None
 
     @contextmanager
     def manager(*args, **kwargs):
+        # Setup context: Set the mock when the this context is invoked.
         func._mock = Mock(*args, **kwargs)
+
+        # Return the mock for the context
         yield func._mock
+
+        # Teardown context: Remove the mock
         func._mock = None
 
     return manager
 
 
 def operation(func):
+    """Decorator that should be set for all API operations."""
     def inner(self, *args, **kwargs):
         # Call the mock if we are in mock mode.
         if func._mock:
             # We do not include self in the call, since that will
             # make the mock's assert helpers act crazy.
             return func._mock(*args, **kwargs)
-        # If we are not mocking, call the actual function.
+        # If we are not mocking, call the actual underlying function.
         return func(self, *args, **kwargs)
+
     # Create a mock manager.
     inner.mock = mock_manager(func)
-    # We set this to easy testing
+
+    # We set this shortcut to the function to simplify testing.
     inner._func = func
     return inner
