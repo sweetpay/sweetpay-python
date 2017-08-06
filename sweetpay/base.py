@@ -56,32 +56,17 @@ class ResponseClass:
 class SweetpayConnector:
     """The base class used to create API clients."""
 
-    DEFAULT_RETRY_ON = (500, 502, 503, 504)
-
-    def __init__(self, api_token, stage, timeout, max_retries=None,
-                 retry_on=None, retry_on_read=False):
+    def __init__(self, api_token, stage, timeout):
         """Initialize the checkout client used to talk to the checkout API.
 
         :param api_token: Same as `SweetpayClient`.
         :param stage: Same as `SweetpayClient`.
         :param timeout: Same as `SweetpayClient`.
-        :param headers: Optional. A dictionary of headers to update the
-                        session headers with.
-        :param max_retries: Optional. Set the amount of max retries of
-                            requests to the API. Defaults to no retries.
-        :param retry_on: Optional. The HTTP status codes to retry the
-            request on.
-        :param retry_on_read: Optional. Whether to retry on read
-            operations or not. If the request is not idempotent,
-            a read retry may result in one action being performed twice.
         """
         self.api_token = api_token
         self.stage = stage
         self.timeout = timeout
         self.logger = logger
-        self.max_retries = max_retries
-        self.retry_on = retry_on or self.DEFAULT_RETRY_ON
-        self.retry_on_read = retry_on_read
         self.headers = self.create_headers()
 
     def create_headers(self):
@@ -165,18 +150,6 @@ class SweetpayConnector:
         """Return a session object to use for sending the request."""
         session = Session()
         session.headers = self.headers
-        # Configure max retries if configured
-        max_retries = self.max_retries
-        if max_retries:
-            kwargs = {
-                "total": max_retries, "status_forcelist": self.retry_on,
-                "connect": max_retries
-            }
-            if self.retry_on_read:
-                kwargs["read"] = self.retry_on_read
-            retries = Retry(**kwargs)
-            adapter = HTTPAdapter(max_retries=retries)
-            session.mount("https://", adapter)
         return session
 
     def encode_data(self, method, params):
