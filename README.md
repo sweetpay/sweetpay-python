@@ -213,3 +213,13 @@ data = client.subscription.search(country="SE")
 ```python
 data = client.subscription.list_log(subscription_id)
 ```
+
+### Extending a subscription
+```python
+data = client.subscription.extend(subscription_id, maxExecutions=8)
+```
+
+### Expiring a subscription
+```python
+data = client.subscription.expire(subscription_id)
+```
