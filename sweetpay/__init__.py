@@ -26,7 +26,10 @@ class SweetpayClient:
         (None, None): BaseResource
     }
 
-    def __init__(self, api_token, stage, version, timeout=15, connector=None):
+    DEFAULT_CONNECTOR = SweetpayConnector
+    DEFAULT_TIMEOUT = 15
+
+    def __init__(self, api_token, stage, version, timeout=None, connector=None):
         """Configure the API with default values.
 
         :param api_token: The API token provided by SweetPay.
@@ -41,8 +44,8 @@ class SweetpayClient:
         self.api_token = api_token
         self.stage = stage
         self.version = version
-        self.timeout = timeout
-        self.connector = connector or SweetpayConnector
+        self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.connector = connector or self.DEFAULT_CONNECTOR
 
         # Create the resources.
         for namespace, version in version.items():
