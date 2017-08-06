@@ -31,7 +31,7 @@ Note that all code examples below this point will assume that you've already con
 data = client.subscription.search(merchantId="<your-merchant-id>")
 
 # If all went well, a dictionary with the JSON data is returned.
-# Otherwise, an error is raised.
+# If something went wrong, an exception is raised.
 print(data)
 
 ```
@@ -159,7 +159,7 @@ Instead of using the built-in mocking support (which is just a convenience wrapp
 
 ## Callbacks & Deserialization
 
-This library provides no helpers for receiving callbacks and deserializing the API request data. You can use something like [Flask](http://flask.pocoo.org/) or [Django](https://www.djangoproject.com/) for that, and then use [marshmallow](https://marshmallow.readthedocs.io/en/latest/) for deserializing data (i.e. turning JSON data into Python objects, e.g. converting ISO formatted strings into `datetime.datetime` objects.).
+This library provides no helpers for receiving callbacks and deserializing the API request data. You can use something like [Flask](http://flask.pocoo.org/) or [Django](https://www.djangoproject.com/) for that, and then use [marshmallow](https://marshmallow.readthedocs.io/en/latest/) for deserializing data (turning JSON data into Python objects, e.g. converting ISO formatted strings into `datetime.datetime` objects).
 
 # API Documentations
 

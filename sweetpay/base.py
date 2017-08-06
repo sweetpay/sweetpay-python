@@ -56,7 +56,10 @@ class ResponseClass:
 class SweetpayConnector:
     """The base class used to create API clients."""
 
-    def __init__(self, api_token, stage, timeout, max_retries=None):
+    DEFAULT_RETRY_ON = (500, 502, 503, 504)
+
+    def __init__(self, api_token, stage, timeout, max_retries=None,
+                 retry_on=None, retry_on_read=False):
         """Initialize the checkout client used to talk to the checkout API.
 
         :param api_token: Same as `SweetpayClient`.
@@ -66,20 +69,20 @@ class SweetpayConnector:
                         session headers with.
         :param max_retries: Optional. Set the amount of max retries of
                             requests to the API. Defaults to no retries.
+        :param retry_on: Optional. The HTTP status codes to retry the
+            request on.
+        :param retry_on_read: Optional. Whether to retry on read
+            operations or not. If the request is not idempotent,
+            a read retry may result in one action being performed twice.
         """
         self.api_token = api_token
         self.stage = stage
         self.timeout = timeout
         self.logger = logger
-        self.session = Session()
-
-        # Configure max retries if passed
-        if max_retries:
-            retries = Retry(total=max_retries)
-            adapter = HTTPAdapter(max_retries=retries)
-            self.session.mount("https://", adapter)
-
-        self.session.headers = self.create_headers()
+        self.max_retries = max_retries
+        self.retry_on = retry_on or self.DEFAULT_RETRY_ON
+        self.retry_on_read = retry_on_read
+        self.headers = self.create_headers()
 
     def create_headers(self):
         """Return headers to use in each request."""
@@ -134,9 +137,13 @@ class SweetpayConnector:
         :param reqkwargs: The keyword arguments to pass to the
             request function.
         """
+
+        # We need to create the session on every request to
+        # keep the library thread-safe.
+        session = self.create_session()
         try:
             # Send the actual request
-            resp = self.session.request(method=method, url=url, **reqkwargs)
+            resp = session.request(method=method, url=url, **reqkwargs)
         except requests.Timeout as e:
             # If the request timed out.
             raise TimeoutError(
@@ -153,6 +160,24 @@ class SweetpayConnector:
             "Sent request to url=%s and method=%s, "
             "received status_code=%d", url, method, resp.status_code)
         return resp
+
+    def create_session(self):
+        """Return a session object to use for sending the request."""
+        session = Session()
+        session.headers = self.headers
+        # Configure max retries if configured
+        max_retries = self.max_retries
+        if max_retries:
+            kwargs = {
+                "total": max_retries, "status_forcelist": self.retry_on,
+                "connect": max_retries
+            }
+            if self.retry_on_read:
+                kwargs["read"] = self.retry_on_read
+            retries = Retry(**kwargs)
+            adapter = HTTPAdapter(max_retries=retries)
+            session.mount("https://", adapter)
+        return session
 
     def encode_data(self, method, params):
         """Encode the request data.
