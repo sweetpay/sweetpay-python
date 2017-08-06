@@ -10,7 +10,7 @@ import requests
 from unittest.mock import Mock
 from requests import Session
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3 import Retry
+from urllib3 import Retry
 
 from .utils import logger
 from .errors import SweetpayError, BadDataError, InvalidParameterError, \
@@ -36,28 +36,21 @@ class SweetpayJSONEncoder(json.JSONEncoder):
 class ResponseClass:
     """The response class returning response data from API calls."""
 
-    def __init__(self, response, code, data, status):
+    def __init__(self, response, code, data):
         """Init the class.
 
         :param response: The requests response object.
         :param code: The HTTP status code.
         :param data: The JSON decoded data.
-        :param status: The status from Paylevo.
         """
         self.response = response
         self.code = code
         self.data = data
-        self.status = status
-
-    @property
-    def status_ok(self):
-        return self.status == OK_STATUS
 
     def __repr__(self):
         return (
-            "<ResponseClass: code={0}, status={1}, "
-            "response={2}, data=(...)>".format(
-                self.code, self.status, self.response))
+            "<ResponseClass: code={0}, response={1}, data={2}>".format(
+                self.code, self.response, self.data))
 
 
 class SweetpayConnector:
@@ -79,17 +72,21 @@ class SweetpayConnector:
         self.timeout = timeout
         self.logger = logger
         self.session = Session()
-        self.session.headers.update({
-            "Authorization": api_token, "Content-Type": "application/json",
-            "Accept": "application/json", "User-Agent": "Python-SDK"
-        })
-        self.session.headers.update(headers or {})
 
         # Configure max retries if passed
         if max_retries:
             retries = Retry(total=max_retries)
             adapter = HTTPAdapter(max_retries=retries)
             self.session.mount("https://", adapter)
+
+        self.session.headers = self.create_headers()
+
+    def create_headers(self):
+        """Return headers to use in each request."""
+        return {
+            "Authorization": self.api_token, "Content-Type": "application/json",
+            "Accept": "application/json", "User-Agent": "Python-SDK"
+        }
 
     def make_request(self, url, method, params=None):
         """Make a request to a passed URL.
@@ -104,38 +101,39 @@ class SweetpayConnector:
         :return: Return a `ResponseClass` instance.
         """
 
-        logger = self.logger
-        # We want the method to be in lower-case for easier handling.
+        # We want the method to be in upper-case for comparison reasons.
         method = method.upper()
 
         # Set default values for the request args and kwargs.
         reqkwargs = {"timeout": self.timeout}
 
-        logger.info("Sending request with method=%s to url=%s", method, url)
-
-        # Handle the method types appropriately
-        if method == "GET":
-            pass
-        elif method == "POST":
-            if params:
-                # Encode the data to JSON
-                reqdata = self.get_json_encoder().encode(params)
-            else:
-                # Use an empty body
-                reqdata = {}
-            # Debug logging since this may be sensitive data.
-            logger.debug("Sending data=%s", reqdata)
-            # Set the data to send in the dictionary to pass to the
-            # request.
-            reqkwargs["data"] = reqdata
-        else:
-            raise ValueError(
-                "Only GET and POST requests are allowed, not method=%s",
-                method)
+        # Encode the data
+        reqkwargs["data"] = self.encode_data(method, params)
 
         # Pre process the request data.
         reqkwargs = self.pre_process_request(method, url, reqkwargs)
 
+        # Send the actual request
+        self.logger.info(
+            "Sending request with method=%s to url=%s", method, url)
+        resp = self.send_request(method, url, reqkwargs)
+
+        # Try to decode the response
+        data = self.decode_data(resp.text)
+
+        # Post process the request.
+        respcls = ResponseClass(resp, resp.status_code, data)
+        respcls = self.post_process_request(respcls)
+        return respcls
+
+    def send_request(self, method, url, reqkwargs):
+        """Send a request to the server.
+
+        :param method: The HTTP method to use.
+        :param url: The URL to send the request to.
+        :param reqkwargs: The keyword arguments to pass to the
+            request function.
+        """
         try:
             # Send the actual request
             resp = self.session.request(method=method, url=url, **reqkwargs)
@@ -151,28 +149,45 @@ class SweetpayConnector:
                 "the `exc` attribute to see the underlying "
                 "`requests` exception", code=None, status=None,
                 response=None, exc=e)
+        logger.info(
+            "Sent request to url=%s and method=%s, "
+            "received status_code=%d", url, method, resp.status_code)
+        return resp
+
+    def encode_data(self, method, params):
+        """Encode the request data.
+
+        :param method: The HTTP method.
+        :param params: The data to encode, if any.
+        """
+        if method == "GET":
+            return None
+        elif method == "POST":
+            if params:
+                # Encode the data to JSON
+                data = self.get_json_encoder().encode(params)
+            else:
+                # Use an empty body
+                data = {}
+            return data
         else:
-            logger.info(
-                "Sent request to url=%s and method=%s, "
-                "received status_code=%d", url, method, resp.status_code)
-            logger.debug(
-                "Received body=%s", resp.text)
+            raise ValueError(
+                "Only GET and POST requests are allowed, not "
+                "method=%s".format(method))
 
-        # Try to decode the (hopefully) JSON response
+    def decode_data(self, rawdata):
+        """Decode the response returned from the server.
+
+        This would be the place to decode JSON.
+
+        :param rawdata: The raw data to decode.
+        :return: The response data.
+        """
         try:
-            data = resp.json()
+            return json.loads(rawdata)
         except (TypeError, ValueError):
-            logger.error(
-                "Could not deserialize JSON for request "
-                "to url=%s, response=%s", url, resp.text)
-            data = resp.text
-
-        # Create the representation of the response.
-        respcls = ResponseClass(
-            response=resp, code=resp.status_code, data=data, status=None)
-        # Post process the request.
-        respcls = self.post_process_request(respcls)
-        return respcls
+            logger.error("Could not deserialize JSON data=%s", rawdata)
+            return rawdata
 
     def pre_process_request(self, method, url, reqkwargs):
         """Pre process the request.
@@ -180,50 +195,33 @@ class SweetpayConnector:
         :param method: The method used. Can not be modified.
         :param url: The URL to send the request to. Can not be modified.
         :param reqkwargs: The keyword arguments to send to the
-            underlying `requests` call. `data` may be present in
-            the dictionary if this is a POST request.
+            underlying `requests` call. `data` will be present, but
+            it's value and type may not be assumed.
         :return: The reqkwargs to give to the underyling `requests` call.
         """
         return reqkwargs
 
-    def post_process_request(self, resp):
+    def post_process_request(self, respcls):
         """Process the ResponseClass directly after the request was made.
 
         If you override this method, it is recommended that you call
         super() first and then do your own post processing..
 
-        :param resp: An instance of ResponseClass, representing the response data.
-        :return: Must return an instance of ResponseClass. It is
-            recommended to return the same instance that
-            was passed in.
+        :param respcls: The ResponseClass to post process.
+        :return: The data returned from the server.
         """
         # Now it's time to extract the status.
-        if isinstance(resp.data, str):
-            # Sometimes a string is returned, which passes the JSON
-            # validation for whatever reason. If that happens,
-            # we set the status to that string as a hacky workaround.
-            status = resp.data
-            resp.data = None
-        else:
-            # If no status was passed, we just set the status to None.
-            try:
-                status = resp.data["status"]
-            except (KeyError, TypeError):
-                # No status was found
-                status = None
-
-        resp.status = status
-        return resp
+        return respcls
 
     def get_json_encoder(self):
-        """Return the JSON encoder to use for encoding request data.
+        """Return an instance of the encoder to use for encoding request data.
 
-        This method may be overwritten to provide your own JSON encoder."""
+        This method may be overwritten to provide your own encoder.
+        """
         return SweetpayJSONEncoder()
 
     def __repr__(self):
-        return "<{0}: stage={1}, version={2}>".format(
-            type(self).__name__, self.stage, self.version)
+        return "<{0}: stage={1}>".format(type(self).__name__, self.stage)
 
 
 class BaseResource(object):
@@ -231,9 +229,9 @@ class BaseResource(object):
     namespace = None
 
     def __init__(self, stage, connector, *connector_args, **connector_kwargs):
+        self.stage = stage
         self.client = connector(
             *connector_args, stage=stage, **connector_kwargs)
-        self.stage = stage
 
     @property
     def stage_url(self):
@@ -260,7 +258,7 @@ class BaseResource(object):
         """Return a URL based on the `url` and a provided path.
 
         :param args: The arguments which will be used to build the path.
-                For example: "path" and "to" creates the path "/path/to".
+            For example: "path" and "to" creates the path "/path/to".
         :return: A complete URL as a string.
         """
         return os.path.join(self.url, *args)
@@ -275,22 +273,17 @@ class BaseResource(object):
         :return: A `ResponseClass` instance.
         """
 
-        # Call the actual method. Note that this may raise an
-        # AttributeError if the method doesn't exist, but we
-        # let that bubble up. It may also raise a RequestError,
-        # but as that is a subclass of SweetpayError we let that
-        # bubble up as well.
+        # Make the actual API call.
         respcls = self.client.make_request(url, method, params)
 
         # The last thing we do is to check for errors. If an error
-        # was found, raise an exception. If no error is found, a
-        # dictionary of the response data is returned.
+        # was found, raise an exception. If no error was found, a
+        # dictionary of the response data will be returned.
         return self.check_for_errors(
-            code=respcls.code, data=respcls.data, status=respcls.status,
-            response=respcls.response)
+            code=respcls.code, data=respcls.data, response=respcls.response)
 
     @classmethod
-    def check_for_errors(cls, code, status, data, response):
+    def check_for_errors(cls, code, data, response):
         """Inspect a response for errors.
 
         This method must raise relevant exceptions or return some
@@ -299,7 +292,6 @@ class BaseResource(object):
         the ResponseClass if all is well.
 
         :param code: The HTTP code returned from the server.
-        :param status: The status returned from the server.
         :param data: The data returned from the server.
         :param response: The actual response returned from the server.
         :raise BadDataError: If the HTTP status code is 400.
@@ -314,72 +306,78 @@ class BaseResource(object):
         :raise ProxyError: If a proxy error occurred.
         :raise TimeoutError: If a request timeout occurred.
         :raise RequestError: If an unhandled request error occurred.
+        :raise SweetpayError: If no other handler was found.
         :return: A dictionary representing the data from the server.
         """
 
         # The standard kwargs to send to the exception when raised
         exc_kwargs = {
-            "code": code, "response": response, "status": status,
-            "data": data
+            "code": code, "response": response, "data": data
         }
+
+        # Hacky workaround to get a status
+        try:
+            status = data["status"]
+        except (KeyError, TypeError):
+            status = None
+        exc_kwargs["status"] = status
 
         # Check if the response was successful.
         if code == 200:
+            # If all OK, return the JSON data.
             if status == OK_STATUS:
-                # If all OK, return the JSON data.
                 return data
-            else:
-                raise FailureStatusError(
-                    "The passed status={0} is not the OK_STATUS={1}, "
-                    "meaning that the requested operation did not "
-                    "succeed".format(status, OK_STATUS), **exc_kwargs)
-
-        # TODO: Is this really how we should do it?
-        # Hacky workaround set the status from the error.
-        if status is None and hasattr(data, "get"):
-            status = data.get("error", None)
-            exc_kwargs["status"] = status
-
-        # Start checking for errors
-        if code == 400:
-            raise BadDataError(
-                "The data passed to the server contained bad data. "
-                "This most likely means that you missed to send some "
-                "parameters, response data={0}, "
-                "status={1}".format(data, status), **exc_kwargs)
-        elif code == 401:
-            raise UnauthorizedError(
-                "The passed API token was invalid", **exc_kwargs)
-        elif code == 404:
-            raise NotFoundError(
-                "The resource you were looking for couldn't be found",
-                **exc_kwargs)
-        elif code == 405:
-            # We usually shouldn't get here unless there is something
-            # wrong with the API client
-            raise MethodNotAllowedError(
-                "The specified method is not allowed on this endpoint",
-                **exc_kwargs)
-        elif code == 422:
-            raise InvalidParameterError(
-                "You passed in an invalid parameter or missed a "
-                "parameter, response data={0}".format(data), **exc_kwargs)
-        elif code == 500:
-            raise InternalServerError(
-                "An internal server occurred", **exc_kwargs)
-        elif code == 502:
-            raise ProxyError(
-                "A proxy error occurred. Note that if you tried to create "
-                "a new resource, it is possible that it was created, "
-                "even though this error occurred.", **exc_kwargs)
-        elif code == 503:
-            raise UnderMaintenanceError(
-                "The server is currently under maintenance and can't "
-                "be contacted", **exc_kwargs)
+            exc = FailureStatusError
+            msg = (
+                "The passed status={0} is not the OK_STATUS={1}, "
+                "meaning that the requested operation did not "
+                "succeed".format(status, OK_STATUS))
         else:
-            # Something else happened, just throw a general error.
-            raise SweetpayError(
-                "Something went wrong in the request", **exc_kwargs)
+            # Start checking for errors
+            if code == 400:
+                exc = BadDataError
+                msg = (
+                    "The data passed to the server contained bad data. "
+                    "This most likely means that you missed to send some "
+                    "parameters")
+            elif code == 401:
+                exc = UnauthorizedError
+                msg = "The passed API token was invalid"
+            elif code == 404:
+                exc = NotFoundError
+                msg = "The resource you were looking for couldn't be found"
+            elif code == 405:
+                # We usually shouldn't get here unless there is something
+                # wrong with the API client
+                exc = MethodNotAllowedError
+                msg = "The specified method is not allowed on this endpoint"
+            elif code == 422:
+                exc = InvalidParameterError
+                msg = (
+                    "You passed in an invalid parameter or missed a "
+                    "parameter".format(data))
+            elif code == 500:
+                exc = InternalServerError
+                msg = "An internal server occurred"
+            elif code == 502:
+                exc = ProxyError
+                msg = (
+                    "A proxy error occurred. Note that if you tried to create "
+                    "a new resource, it is possible that it was created, "
+                    "even though this error occurred")
+            elif code == 503:
+                exc = UnderMaintenanceError
+                msg = (
+                    "The server is currently under maintenance and can't "
+                    "be contacted")
+            else:
+                # Something else happened, just throw a general error.
+                exc = SweetpayError
+                msg = "Something went wrong in the request"
+        # Raise the actual exception. We do this at the end because
+        # we want to be completely sure that the exc_kwargs are
+        # actually passed in.
+        raise exc(msg, **exc_kwargs)
 
     def __repr__(self):
         return "<{0}: namespace={1}>".format(

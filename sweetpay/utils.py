@@ -3,8 +3,6 @@ import json
 import logging
 from base64 import b64decode, b64encode
 
-import dateutil.parser
-from dateutil import tz
 from datetime import datetime
 from .constants import DATE_FORMAT, LOGGER_NAME
 
