@@ -65,6 +65,5 @@ class SweetpayClient:
     def _get_resource_arguments(self, namespace):
         return {
             "api_token": self.api_token, "stage": self.stage,
-            "version": self.version[namespace], "timeout": self.timeout,
-            "connector": self.connector
+            "timeout": self.timeout, "connector": self.connector
         }

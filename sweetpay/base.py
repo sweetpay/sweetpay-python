@@ -63,13 +63,11 @@ class ResponseClass:
 class SweetpayConnector:
     """The base class used to create API clients."""
 
-    def __init__(self, api_token, stage, version, timeout, headers=None,
-                 max_retries=None):
+    def __init__(self, api_token, stage, timeout, max_retries=None):
         """Initialize the checkout client used to talk to the checkout API.
 
         :param api_token: Same as `SweetpayClient`.
         :param stage: Same as `SweetpayClient`.
-        :param version: Same as `SweetpayClient`.
         :param timeout: Same as `SweetpayClient`.
         :param headers: Optional. A dictionary of headers to update the
                         session headers with.
@@ -78,10 +76,8 @@ class SweetpayConnector:
         """
         self.api_token = api_token
         self.stage = stage
-        self.version = version
         self.timeout = timeout
         self.logger = logger
-
         self.session = Session()
         self.session.headers.update({
             "Authorization": api_token, "Content-Type": "application/json",
