@@ -1,4 +1,4 @@
-"""Tests for all operations."""
+"""Test all operations."""
 from datetime import datetime, timedelta
 
 import pytest
@@ -6,10 +6,14 @@ from sweetpay.constants import TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
 from sweetpay.errors import FailureStatusError, BadDataError, NotFoundError
 from uuid import uuid4
 
+# Mark the file as making real API calls
+pytestmark = pytest.mark.apicall
+
+
 # The startsAt to use for subscription. It is important that 
 # this isn't today's date, as that is what the subscription 
-# API defaults to. Also, the Sweetpay API does not allow the starstAt
-# to be too far back in time, that's why we don't just hardcode it.
+# API defaults to. Also, the Sweetpay API does not allow the starts at
+# to be too far back in time, that's why we create it dynamically.
 STARTS_AT = (datetime.utcnow() - timedelta(days=10)).date()
 
 
@@ -33,18 +37,6 @@ def create_reservation(client, credit=True, **extra):
         }, **extra)
 
 
-def assert_subscription(payload, credit=True):
-    assert payload["customer"]["address"]["country"] == "SE"
-    assert payload["startsAt"] == STARTS_AT
-    assert payload["amount"] == 10
-    assert payload["currency"] == "SEK"
-    assert payload["interval"] == "MONTHLY"
-    assert payload["merchantId"] == "sweetpay-demo"
-    assert payload["customer"]["ssn"] == TEST_CREDIT_SSN if credit else \
-        TEST_NOCREDIT_SSN
-    assert payload["maxExecutions"] == 4
-
-
 def assert_reservation(payload, credit=True):
     assert len(payload) == 1
     reservation = payload[0]
@@ -60,22 +52,17 @@ class TestSubscriptionV1Resource:
         data = create_subscription(client)
         
         # Verify
-        assert_subscription(data["payload"])
-
-    def test_create_with_no_credit(self, client):
-        with pytest.raises(FailureStatusError) as excinfo:
-            # Execute
-            create_subscription(client, credit=False)
-            
-        # Verify
-        exc = excinfo.value
-        assert exc.data
-        assert "payload" not in exc.data  # Expecting no payload
-        assert exc.status == "CUSTOMER_NOT_CREDIBLE"
+        payload = data["payload"]
+        assert payload["customer"]["address"]["country"] == "SE"
+        assert payload["startsAt"] == STARTS_AT
+        assert payload["amount"] == 10
+        assert payload["currency"] == "SEK"
+        assert payload["interval"] == "MONTHLY"
+        assert payload["merchantId"] == "sweetpay-demo"
+        assert payload["customer"]["ssn"] == TEST_CREDIT_SSN
+        assert payload["maxExecutions"] == 4
 
     # TODO: Test with mock instead.
-    # TODO: Move the test from here, as we are testing a
-    #       hack not related to the subscription API
     def test_create_with_missing_amount(self, client):
         with pytest.raises(BadDataError) as excinfo:
             # Execute
@@ -114,7 +101,6 @@ class TestSubscriptionV1Resource:
         assert len(payload) == 1
 
         subscription = payload[0]
-        assert_subscription(subscription)
         assert subscription["merchantItemId"] == identifier
 
     # TODO: Test with mock instead, this is an API test.
@@ -122,9 +108,6 @@ class TestSubscriptionV1Resource:
         with pytest.raises(BadDataError) as excinfo:
             client.subscription.search()
         exc = excinfo.value
-        # Invalid JSON because the server cannot parse an
-        # empty JSON object for some reason. It is also
-        # possible that requests isn't sending empty dicts.
         assert exc.status == "INVALID_JSON"
 
     def test_update(self, client):

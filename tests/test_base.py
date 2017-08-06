@@ -84,10 +84,11 @@ class TestCheckForErrors:
             # Execute
             resource.check_for_errors(505, None, None)
 
-    def test_error_when_no_status(self, resource):
+    @pytest.mark.parametrize("data", [None, 123, "123", {}])
+    def test_error_when_no_status(self, resource, data):
         # Execute
         with pytest.raises(FailureStatusError) as excinfo:
-            resource.check_for_errors(200, None, None)
+            resource.check_for_errors(200, data, None)
 
         # Verify
         exc = excinfo.value
