@@ -4,22 +4,23 @@ Tests for all base functionality.
 
 import pytest
 
-from sweetpay import BaseResource
-from sweetpay.errors import FailureStatusError, BadDataError, UnauthorizedError, \
-    NotFoundError, MethodNotAllowedError, InvalidParameterError, \
-    InternalServerError, ProxyError, UnderMaintenanceError, SweetpayError
+from sweetpay import Resource
+from sweetpay.errors import FailureStatusError, BadDataError, \
+    UnauthorizedError, NotFoundError, MethodNotAllowedError, \
+    InvalidParameterError, InternalServerError, ProxyError, \
+    UnderMaintenanceError, SweetpayError
 
 
 @pytest.fixture()
 def resource():
-    return BaseResource
+    return Resource
 
 
 class TestCheckForErrors:
 
     def test_ok(self, resource):
         # Execute
-        data = resource.check_for_errors(200, {"status": "OK"}, None)
+        data = resource._check_for_errors(200, {"status": "OK"}, None)
 
         # Verify
         assert data == {"status": "OK"}
@@ -28,67 +29,67 @@ class TestCheckForErrors:
         # Verify
         with pytest.raises(FailureStatusError):
             # Execute
-            resource.check_for_errors(200, {"status": "NOT_ENOUGH_CREDIT"}, None)
+            resource._check_for_errors(200, {"status": "NOT_ENOUGH_CREDIT"}, None)
 
     def test_bad_data(self, resource):
         # Verify
         with pytest.raises(BadDataError):
             # Execute
-            resource.check_for_errors(400, None, None)
+            resource._check_for_errors(400, None, None)
 
     def test_unauthorized(self, resource):
         # Verify
         with pytest.raises(UnauthorizedError):
             # Execute
-            resource.check_for_errors(401, None, None)
+            resource._check_for_errors(401, None, None)
 
     def test_not_found(self, resource):
         # Verify
         with pytest.raises(NotFoundError):
             # Execute
-            resource.check_for_errors(404, None, None)
+            resource._check_for_errors(404, None, None)
 
     def test_method_not_allowed(self, resource):
         # Verify
         with pytest.raises(MethodNotAllowedError):
             # Execute
-            resource.check_for_errors(405, None, None)
+            resource._check_for_errors(405, None, None)
 
     def test_invalid_parameter(self, resource):
         # Verify
         with pytest.raises(InvalidParameterError):
             # Execute
-            resource.check_for_errors(422, None, None)
+            resource._check_for_errors(422, None, None)
 
     def test_internal_server_error(self, resource):
         # Verify
         with pytest.raises(InternalServerError):
             # Execute
-            resource.check_for_errors(500, None, None)
+            resource._check_for_errors(500, None, None)
 
     def test_proxy_error(self, resource):
         # Verify
         with pytest.raises(ProxyError):
             # Execute
-            resource.check_for_errors(502, None, None)
+            resource._check_for_errors(502, None, None)
 
     def test_under_maintenance(self, resource):
         # Verify
         with pytest.raises(UnderMaintenanceError):
             # Execute
-            resource.check_for_errors(503, None, None)
+            resource._check_for_errors(503, None, None)
 
     def test_general_exception(self, resource):
         # Verify
         with pytest.raises(SweetpayError):
             # Execute
-            resource.check_for_errors(505, None, None)
+            resource._check_for_errors(505, None, None)
 
     @pytest.mark.parametrize("data", [None, 123, "123", {}])
     def test_error_when_no_status(self, resource, data):
         # Execute
         with pytest.raises(FailureStatusError) as excinfo:
-            resource.check_for_errors(200, data, None)
+            resource._check_for_errors(200, data, None)
 
         # Verify
         exc = excinfo.value
@@ -97,7 +98,7 @@ class TestCheckForErrors:
     def test_error_with_status(self, resource):
         # Execute
         with pytest.raises(FailureStatusError) as excinfo:
-            resource.check_for_errors(200, {"status": "SOME_STATUS"}, None)
+            resource._check_for_errors(200, {"status": "SOME_STATUS"}, None)
 
         # Verify
         exc = excinfo.value
@@ -106,7 +107,7 @@ class TestCheckForErrors:
     def test_error_with_code(self, resource):
         # Execute
         with pytest.raises(FailureStatusError) as excinfo:
-            resource.check_for_errors(200, None, None)
+            resource._check_for_errors(200, None, None)
 
         # Verify
         exc = excinfo.value
@@ -119,7 +120,7 @@ class TestCheckForErrors:
 
         # Execute
         with pytest.raises(FailureStatusError) as excinfo:
-            resource.check_for_errors(200, None, response)
+            resource._check_for_errors(200, None, response)
 
         # Verify
         exc = excinfo.value

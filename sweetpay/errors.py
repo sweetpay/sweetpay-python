@@ -1,56 +1,14 @@
-class SweetpayError(Exception):
+from restbase.base import RESTBaseException
+
+
+class SweetpayError(RESTBaseException):
     """The base Sweetpay exception. Raised for ambiguous scenarios,
     when no other exception type fits.
     """
 
-    # The JSON decoded data from the server. None if the JSON
-    # couldn't be decoded.
-    data = None
-
-    # The requests response object returned from the server.
-    # None if the request failed.
-    response = None
-
-    # The HTTP status code as an integer. None if the request failed.
-    code = None
-
-    # The status extracted from the payload. None if the JSON
-    # couldn't be decoded or if no status for some reason wasn't
-    # returned from the server.
-    status = None
-
-    # This is a link to the requests exception that triggered
-    # this error. Check this attribute if you want to see what kind
-    # of request error occurred (e.g. a timeout).
-    exc = None
-
-    def __init__(self, msg=None, data=None, response=None, code=None,
-                 status=None, exc=None):
-        super().__init__(msg)
-        self.data = data
-        self.response = response
-        self.code = code
+    def __init__(self, *args, status=None, **kwargs):
+        super().__init__(*args, **kwargs)
         self.status = status
-        self.exc = exc
-
-    @property
-    def request_sent(self):
-        """Return a boolean to indicate if a request was sent to the server.
-
-        This will for example be False in the case of timeouts."""
-        return self.response is not None
-
-    @property
-    def is_json(self):
-        """Return a boolean to indicate if the resp data is JSON."""
-        return self.data is not None
-
-    def to_dict(self):
-        """Convert the exception data to a dictionary."""
-        return {
-            "data": self.data, "response": self.response, "code": self.code,
-            "status": self.status, "exc": self.exc, "msg": self.args[0]
-        }
 
 
 class FailureStatusError(SweetpayError):

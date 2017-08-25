@@ -9,27 +9,6 @@ from .constants import DATE_FORMAT, LOGGER_NAME
 logger = logging.Logger(LOGGER_NAME)
 
 
-def decode_datetime(value, to_utc=True):
-    """Decode a datetime string.
-
-    :param value: The string to convert into a datetime.
-    :param to_utc: Whether to convert the timezone to UTC or not.
-    :raise ValueError: If the passed value is invalid, for
-                       example if it is empty.
-    :return: A `datetime.datetime` object.
-    """
-    if not value:
-        raise ValueError("value parameter cannot be empty")
-
-    dt = dateutil.parser.parse(value)
-    if to_utc:
-        # Make sure that it doesn't fail when the datetime is naive
-        if dt.tzinfo is not None:
-            utc = tz.gettz("UTC")
-            dt = dt.astimezone(utc)
-    return dt
-
-
 def decode_date(value):
     """Decode a date string.
 

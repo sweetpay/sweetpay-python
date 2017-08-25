@@ -1,6 +1,6 @@
 from setuptools import setup
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 setup(
     name="sweetpay",
@@ -14,5 +14,5 @@ setup(
     download_url="https://github.com/sweetpay/sweetpay-"
                  "python/tarball/%s" % __version__,
     packages=["sweetpay"],
-    install_requires=["requests>2.0"]
+    install_requires=["restbase"]
 )

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from sweetpay.constants import TEST_CREDIT_SSN, TEST_NOCREDIT_SSN
-from sweetpay.errors import FailureStatusError, BadDataError, NotFoundError
+from sweetpay.errors import BadDataError, NotFoundError
 from uuid import uuid4
 
 # Mark the file as making real API calls
